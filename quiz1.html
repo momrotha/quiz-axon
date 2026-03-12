@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CQRS + Event Sourcing + Axon — Step by Step</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;0,9..144,800;1,9..144,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0c0f0a;
+  --surface: #131710;
+  --surface2: #1a1f16;
+  --border: #252b1f;
+  --accent: #a3e635;       /* lime */
+  --accent-dim: rgba(163,230,53,.12);
+  --accent2: #fb923c;      /* orange */
+  --accent2-dim: rgba(251,146,60,.1);
+  --accent3: #38bdf8;      /* sky */
+  --accent3-dim: rgba(56,189,248,.1);
+  --purple: #c084fc;
+  --purple-dim: rgba(192,132,252,.1);
+  --text: #e8eddf;
+  --muted: #5a6347;
+  --muted2: #8a9478;
+  --danger: #f87171;
+  --success: #4ade80;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Fraunces', Georgia, serif;
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+/* ── NOISE OVERLAY ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity: .4;
+}
+
+/* ── SIDEBAR ── */
+.layout { display: flex; min-height: 100vh; }
+
+nav.sidebar {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 260px;
+  background: var(--surface); border-right: 1px solid var(--border);
+  overflow-y: auto; z-index: 50; padding: 1.5rem 0;
+  display: flex; flex-direction: column;
+}
+
+.nav-logo {
+  padding: 0 1.4rem 1.4rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+.nav-logo-title {
+  font-size: 1.05rem; font-weight: 800; letter-spacing: -.02em;
+  color: var(--accent); line-height: 1.2;
+}
+.nav-logo-sub {
+  font-family: 'IBM Plex Mono', monospace; font-size: .62rem;
+  color: var(--muted2); letter-spacing: .1em; margin-top: .3rem;
+}
+
+.nav-section-label {
+  font-family: 'IBM Plex Mono', monospace; font-size: .6rem;
+  color: var(--muted); letter-spacing: .15em; text-transform: uppercase;
+  padding: .8rem 1.4rem .3rem;
+}
+
+.nav-item {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .45rem 1.4rem; cursor: pointer;
+  font-family: 'IBM Plex Mono', monospace; font-size: .72rem;
+  color: var(--muted2); text-decoration: none;
+  transition: all .15s; border-left: 2px solid transparent;
+}
+.nav-item:hover { color: var(--text); background: var(--surface2); }
+.nav-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-dim); }
+.nav-item .step-num {
+  width: 20px; height: 20px; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .6rem; font-weight: 700; flex-shrink: 0;
+  background: var(--surface2); border: 1px solid var(--border);
+}
+.nav-item.active .step-num { background: var(--accent); color: #0c0f0a; border-color: var(--accent); }
+.nav-item.done .step-num { background: rgba(74,222,128,.15); color: var(--success); border-color: rgba(74,222,128,.3); }
+
+.nav-progress {
+  margin-top: auto; padding: 1rem 1.4rem;
+  border-top: 1px solid var(--border);
+  font-family: 'IBM Plex Mono', monospace; font-size: .65rem; color: var(--muted2);
+}
+.nav-prog-bar { height: 3px; background: var(--border); border-radius: 2px; margin-top: .4rem; overflow: hidden; }
+.nav-prog-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .4s ease; }
+
+/* ── MAIN CONTENT ── */
+main {
+  margin-left: 260px; flex: 1;
+  padding: 0;
+}
+
+/* ── TOP BAR ── */
+.topbar {
+  position: sticky; top: 0; z-index: 40;
+  background: rgba(12,15,10,.92); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: .8rem 2.5rem;
+  display: flex; align-items: center; gap: 1rem;
+}
+.topbar-breadcrumb {
+  font-family: 'IBM Plex Mono', monospace; font-size: .72rem; color: var(--muted2);
+}
+.topbar-breadcrumb span { color: var(--accent); }
+.topbar-nav { margin-left: auto; display: flex; gap: .5rem; }
+.topbar-btn {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--muted2); font-family: 'IBM Plex Mono', monospace; font-size: .68rem;
+  padding: .35rem .8rem; border-radius: 6px; cursor: pointer; transition: all .15s;
+}
+.topbar-btn:hover { border-color: var(--accent); color: var(--accent); }
+.topbar-btn:disabled { opacity: .3; cursor: not-allowed; }
+
+/* ── STEP PAGE ── */
+.step-page { display: none; padding: 2.5rem 2.5rem 4rem; max-width: 900px; }
+.step-page.active { display: block; animation: fadeUp .3s ease; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+
+/* STEP HERO */
+.step-hero {
+  display: flex; align-items: flex-start; gap: 1.2rem; margin-bottom: 2rem;
+  padding-bottom: 1.5rem; border-bottom: 1px solid var(--border);
+}
+.step-badge {
+  flex-shrink: 0; width: 52px; height: 52px; border-radius: 14px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-family: 'IBM Plex Mono', monospace; font-weight: 700; gap: 1px;
+}
+.badge-lime { background: var(--accent-dim); border: 1px solid rgba(163,230,53,.3); color: var(--accent); }
+.badge-orange { background: var(--accent2-dim); border: 1px solid rgba(251,146,60,.3); color: var(--accent2); }
+.badge-sky { background: var(--accent3-dim); border: 1px solid rgba(56,189,248,.3); color: var(--accent3); }
+.badge-purple { background: var(--purple-dim); border: 1px solid rgba(192,132,252,.3); color: var(--purple); }
+.badge-lime2 { background: rgba(74,222,128,.08); border: 1px solid rgba(74,222,128,.3); color: var(--success); }
+.step-badge .badge-num { font-size: 1.3rem; line-height: 1; }
+.step-badge .badge-label { font-size: .45rem; letter-spacing: .08em; text-transform: uppercase; opacity: .7; }
+.step-hero-text h2 { font-size: 1.8rem; font-weight: 800; line-height: 1.2; margin-bottom: .4rem; }
+.step-hero-text p { color: var(--muted2); font-size: 1rem; font-weight: 300; font-style: italic; }
+
+/* WHAT YOU'LL LEARN */
+.learn-box {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 1.1rem 1.3rem; margin-bottom: 1.8rem;
+  display: flex; gap: 1rem; align-items: flex-start;
+}
+.learn-icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 2px; }
+.learn-items { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .4rem; }
+.learn-tag {
+  font-family: 'IBM Plex Mono', monospace; font-size: .65rem;
+  padding: .2rem .55rem; border-radius: 4px; border: 1px solid var(--border);
+  color: var(--muted2); background: var(--surface2);
+}
+
+/* EXPLANATION BOX */
+.explain-block {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 1.4rem 1.6rem; margin-bottom: 1.5rem;
+}
+.explain-block h3 {
+  font-size: 1rem; font-weight: 600; color: var(--accent); margin-bottom: .7rem;
+  display: flex; align-items: center; gap: .5rem;
+}
+.explain-block p { font-size: .95rem; color: var(--muted2); line-height: 1.75; margin-bottom: .6rem; }
+.explain-block p:last-child { margin-bottom: 0; }
+.explain-block strong { color: var(--text); font-weight: 600; }
+
+/* FLOW DIAGRAM */
+.flow-diagram {
+  display: flex; align-items: center; justify-content: center;
+  flex-wrap: wrap; gap: .5rem; padding: 1.5rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  margin-bottom: 1.5rem; font-family: 'IBM Plex Mono', monospace; font-size: .75rem;
+}
+.flow-box {
+  padding: .5rem .9rem; border-radius: 8px; text-align: center; line-height: 1.3;
+}
+.fb-lime { background: var(--accent-dim); border: 1px solid rgba(163,230,53,.3); color: var(--accent); }
+.fb-orange { background: var(--accent2-dim); border: 1px solid rgba(251,146,60,.3); color: var(--accent2); }
+.fb-sky { background: var(--accent3-dim); border: 1px solid rgba(56,189,248,.3); color: var(--accent3); }
+.fb-purple { background: var(--purple-dim); border: 1px solid rgba(192,132,252,.3); color: var(--purple); }
+.fb-green { background: rgba(74,222,128,.08); border: 1px solid rgba(74,222,128,.3); color: var(--success); }
+.fb-gray { background: var(--surface2); border: 1px solid var(--border); color: var(--muted2); }
+.flow-arrow { color: var(--muted); font-size: 1rem; }
+.flow-label { font-size: .6rem; color: var(--muted); display: block; margin-top: .2rem; }
+
+/* CODE SECTION */
+.code-section { margin-bottom: 1.8rem; }
+.code-file-header {
+  display: flex; align-items: center; gap: .6rem;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-bottom: none; border-radius: 10px 10px 0 0;
+  padding: .6rem 1rem;
+  font-family: 'IBM Plex Mono', monospace; font-size: .72rem; color: var(--muted2);
+}
+.file-dot { width: 8px; height: 8px; border-radius: 50%; }
+.fd-red { background: #f87171; }
+.fd-yellow { background: #fbbf24; }
+.fd-green { background: var(--success); }
+.file-name { color: var(--text); font-weight: 500; }
+.file-lang { margin-left: auto; color: var(--muted); font-size: .6rem; }
+.copy-code-btn {
+  margin-left: .5rem; background: none; border: 1px solid var(--border);
+  color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: .6rem;
+  padding: .15rem .5rem; border-radius: 4px; cursor: pointer; transition: all .15s;
+}
+.copy-code-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+pre.code-block {
+  background: #080b06; border: 1px solid var(--border);
+  border-radius: 0 0 10px 10px; padding: 1.3rem 1.4rem;
+  overflow-x: auto; margin: 0;
+  font-family: 'IBM Plex Mono', monospace; font-size: .78rem; line-height: 1.8;
+  color: #c9d1b8;
+  counter-reset: line;
+}
+
+/* syntax */
+.kw  { color: #fb923c; }
+.cls { color: #fde68a; }
+.fn  { color: #86efac; }
+.str { color: #a5f3fc; }
+.cmt { color: #4a5e3a; font-style: italic; }
+.ann { color: #c084fc; }
+.num { color: #f9a8d4; }
+.pkg { color: #6ee7b7; }
+.op  { color: #e2e8f0; }
+.line-hl { background: rgba(163,230,53,.06); display: block; margin: 0 -1.4rem; padding: 0 1.4rem; border-left: 2px solid var(--accent); }
+
+/* CALLOUT */
+.callout {
+  display: flex; gap: .8rem; padding: 1rem 1.2rem;
+  border-radius: 10px; margin-bottom: 1.2rem; font-size: .9rem;
+}
+.callout-info { background: var(--accent3-dim); border: 1px solid rgba(56,189,248,.2); color: #7dd3fc; }
+.callout-warn { background: var(--accent2-dim); border: 1px solid rgba(251,146,60,.2); color: #fdba74; }
+.callout-tip  { background: var(--accent-dim);  border: 1px solid rgba(163,230,53,.2); color: var(--accent); }
+.callout-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+.callout p { margin: 0; line-height: 1.6; }
+.callout strong { color: var(--text); }
+
+/* STEP DONE BTN */
+.step-footer {
+  display: flex; align-items: center; gap: 1rem; margin-top: 2.5rem;
+  padding-top: 1.5rem; border-top: 1px solid var(--border);
+}
+.btn-primary {
+  background: var(--accent); color: #0c0f0a;
+  border: none; border-radius: 9px; padding: .7rem 1.6rem;
+  font-family: 'IBM Plex Mono', monospace; font-size: .8rem; font-weight: 600;
+  cursor: pointer; transition: all .15s; letter-spacing: .02em;
+}
+.btn-primary:hover { background: #bef264; transform: translateY(-1px); }
+.btn-secondary {
+  background: none; border: 1px solid var(--border); color: var(--muted2);
+  border-radius: 9px; padding: .7rem 1.4rem;
+  font-family: 'IBM Plex Mono', monospace; font-size: .8rem;
+  cursor: pointer; transition: all .15s;
+}
+.btn-secondary:hover { border-color: var(--muted2); color: var(--text); }
+.step-of { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: .7rem; color: var(--muted); }
+
+/* ANNOTATION LINES */
+.annotated { position: relative; }
+.ann-line {
+  display: flex; align-items: flex-start; gap: .8rem;
+  padding: .5rem .8rem; border-radius: 7px; margin-bottom: .4rem;
+  border: 1px solid var(--border); background: var(--surface2);
+  font-size: .85rem;
+}
+.ann-num {
+  flex-shrink: 0; width: 20px; height: 20px; border-radius: 4px;
+  background: var(--accent-dim); color: var(--accent); font-family: 'IBM Plex Mono', monospace;
+  font-size: .65rem; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(163,230,53,.3); margin-top: 2px;
+}
+.ann-text { color: var(--muted2); line-height: 1.6; }
+.ann-text strong { color: var(--text); }
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  nav.sidebar { transform: translateX(-100%); }
+  main { margin-left: 0; }
+  .step-page { padding: 1.5rem 1.2rem 3rem; }
+  .topbar { padding: .8rem 1.2rem; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="nav-logo">
+    <div class="nav-logo-title">CQRS + ES + Axon</div>
+    <div class="nav-logo-sub">STEP-BY-STEP GUIDE</div>
+  </div>
+
+  <div class="nav-section-label">Foundation</div>
+  <a class="nav-item active" onclick="goTo(0)" href="#">
+    <span class="step-num">1</span> Project Setup
+  </a>
+  <a class="nav-item" onclick="goTo(1)" href="#">
+    <span class="step-num">2</span> Domain Model
+  </a>
+  <a class="nav-item" onclick="goTo(2)" href="#">
+    <span class="step-num">3</span> Commands
+  </a>
+  <a class="nav-item" onclick="goTo(3)" href="#">
+    <span class="step-num">4</span> Events
+  </a>
+
+  <div class="nav-section-label">Write Side</div>
+  <a class="nav-item" onclick="goTo(4)" href="#">
+    <span class="step-num">5</span> Aggregate
+  </a>
+  <a class="nav-item" onclick="goTo(5)" href="#">
+    <span class="step-num">6</span> Command Handler
+  </a>
+  <a class="nav-item" onclick="goTo(6)" href="#">
+    <span class="step-num">7</span> Event Sourcing Handler
+  </a>
+
+  <div class="nav-section-label">Read Side</div>
+  <a class="nav-item" onclick="goTo(7)" href="#">
+    <span class="step-num">8</span> Projection
+  </a>
+  <a class="nav-item" onclick="goTo(8)" href="#">
+    <span class="step-num">9</span> Query + Handler
+  </a>
+
+  <div class="nav-section-label">Advanced</div>
+  <a class="nav-item" onclick="goTo(9)" href="#">
+    <span class="step-num">10</span> Saga
+  </a>
+  <a class="nav-item" onclick="goTo(10)" href="#">
+    <span class="step-num">11</span> Snapshots
+  </a>
+  <a class="nav-item" onclick="goTo(11)" href="#">
+    <span class="step-num">12</span> REST Controller
+  </a>
+
+  <div class="nav-progress">
+    <span id="progText">0 / 12 complete</span>
+    <div class="nav-prog-bar"><div class="nav-prog-fill" id="progFill" style="width:0%"></div></div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main>
+  <div class="topbar">
+    <div class="topbar-breadcrumb">
+      Guide / <span id="breadcrumb">Step 1 — Project Setup</span>
+    </div>
+    <div class="topbar-nav">
+      <button class="topbar-btn" id="prevBtn" onclick="navigate(-1)" disabled>← Prev</button>
+      <button class="topbar-btn" id="nextBtn" onclick="navigate(1)">Next →</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- STEP 1 — PROJECT SETUP -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="step-page active" id="step-0">
+    <div class="step-hero">
+      <div class="step-badge badge-lime"><span class="badge-num">01</span><span class="badge-label">setup</span></div>
+      <div class="step-hero-text">
+        <h2>Project Setup &amp; Dependencies</h2>
+        <p>Create a Spring Boot project with the Axon Framework dependency — this is your foundation for everything else.</p>
+      </div>
+    </div>
+
+    <div class="learn-box">
+      <div class="learn-icon">🎯</div>
+      <div>
+        <div style="font-size:.85rem;font-weight:600;margin-bottom:.4rem;">What you'll set up</div>
+        <div class="learn-items">
+          <span class="learn-tag">Spring Boot 3.x</span>
+          <span class="learn-tag">axon-spring-boot-starter</span>
+          <span class="learn-tag">Spring Web</span>
+          <span class="learn-tag">Spring Data JPA</span>
+          <span class="learn-tag">H2 Database</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="explain-block">
+      <h3>🏗️ Architecture Overview</h3>
+      <p>We will build a simple <strong>Order Management</strong> system. It follows the full CQRS + Event Sourcing + Axon pattern: commands go to the <strong>write side</strong> (aggregate), produce <strong>events</strong> stored in the event store, and <strong>projections</strong> on the read side listen to those events to build a query-optimized view.</p>
+    </div>
+
+    <div class="flow-diagram">
+      <div class="flow-box fb-lime">REST API<br><span class="flow-label">Controller</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box fb-orange">Command<br><span class="flow-label">CommandGateway</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box fb-sky">Aggregate<br><span class="flow-label">Write Side</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box fb-purple">Event<br><span class="flow-label">Event Store</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box fb-green">Projection<br><span class="flow-label">Read Side</span></div>
+    </div>
+
+    <div class="code-section">
+      <div class="code-file-header">
+        <div class="file-dot fd-red"></div><div class="file-dot fd-yellow"></div><div class="file-dot fd-green"></div>
+        <span class="file-name">pom.xml</span>
+        <span class="file-lang">Maven</span>
+        <button class="copy-code-btn" onclick="copyCode(this)">copy</button>
+      </div>
+      <pre class="code-block"><span class="op">&lt;</span><span class="cls">dependencies</span><span class="op">&gt;</span>
+
+  <span class="cmt">&lt;!-- Spring Boot Web --&gt;</span>
+  <span class="op">&lt;</span><span class="cls">dependency</span><span class="op">&gt;</span>
+    <span class="op">&lt;</span><span class="cls">groupId</span><span class="op">&gt;</span>org.springframework.boot<span class="op">&lt;/</span><span class="cls">groupId</span><span class="op">&gt;</span>
+    <span class="op">&lt;</span><span class="cls">artifactId</span><span class="op">&gt;</span>spring-boot-starter-web<span class="op">&lt;/</span><span class="cls">artifactId</span><span class="op">&gt;</span>
+  <span class="op">&lt;/</span><span class="cls">dependency</span><span class="op">&gt;</span>
+
+  <span class="cmt">&lt;!-- Spring Data JPA (for projections + token store) --&gt;</span>
+  <span class="op">&lt;</span><span class="cls">dependency</span><span class="op">&gt;</span>
+    <span class="op">&lt;</span><span class="cls">groupId</span><span class="op">&gt;</span>org.springframework.boot<span class="op">&lt;/</span><span class="cls">groupId</span><span class="op">&gt;</span>
+    <span class="op">&lt;</span><span class="cls">artifactId</span><span class="op">&gt;</span>spring-boot-starter-data-jpa<span class="op">&lt;/</span><span class="cls">artifactId</span><span class="op">&gt;</span>
+  <span class="op">&lt;/</span><span class="cls">dependency</span><span class="op">&gt;</span>
+
+  <span class="cmt">&lt;!-- H2 in-memory DB (dev only) --&gt;</span>
+  <span class="op">&lt;</span><span class="cls">dependency</span><span class="op">&gt;</span>
+    <span class="op">&lt;</span><span class="cls">groupId</span><span class="op">&gt;</span>com.h2database<span class="op">&lt;/</span><span class="cls">groupId</span><span class="op">&gt;</span>
+    <span class="op">&lt;</span><span class="cls">artifactId</span><span class="op">&gt;</span>h2<span class="op">&lt;/</span><span class="cls">artifactId</span><span class="op">&gt;</span>
+    <span class="op">&lt;</span><span class="cls">scope</span><span class="op">&gt;</span>runtime<span class="op">&lt;/</span><span class="cls">scope</span><span class="op">&gt;</span>
+  <span class="op">&lt;/</span><span class="cls">dependency</span><span class="op">&gt;</span>
+
+  <span class="cmt">&lt;!-- ★ Axon Spring Boot Starter — the KEY dependency --&gt;</span>
+  <span class="op">&lt;</span><span class="cls">dependency</span><span class="op">&gt;</span>
+    <span class="op">&lt;</span><span class="cls">groupId</span><span class="op">&gt;</span>org.axonframework<span class="op">&lt;/</span><span class="cls">groupId</span><span class="op">&gt;</span>
+    <span class="op">&lt;</span><span class="cls">artifactId</span><span class="op">&gt;</span>axon-spring-boot-starter<span class="op">&lt;/</span><span class="cls">artifactId</span><span class="op">&gt;</span>
+    <span class="op">&lt;</span><span class="cls">version</span><span class="op">&gt;</span>4.9.3<span class="op">&lt;/</span><span class="cls">version</span><span class="op">&gt;</span>
+  <span class="op">&lt;/</span><span class="cls">dependency</span><span class="op">&gt;</span>
+
+<span class="op">&lt;/</span><span class="cls">dependencies</span><span class="op">&gt;</span></pre>
+    </div>
+
+    <div class="code-section">
+      <div class="code-file-header">
+        <div class="file-dot fd-red"></div><div class="file-dot fd-yellow"></div><div class="file-dot fd-green"></div>
+        <span class="file-name">application.yml</span>
+        <span class="file-lang">YAML</span>
+        <button class="copy-code-btn" onclick="copyCode(this)">copy</button>
+      </div>
+      <pre class="code-block"><span class="cls">spring</span>:
+  <span class="cls">datasource</span>:
+    <span class="cls">url</span>: <span class="str">jdbc:h2:mem:orderdb</span>
+    <span class="cls">driver-class-name</span>: <span class="str">org.h2.Driver</span>
+  <span class="cls">jpa</span>:
+    <span class="cls">hibernate</span>:
+      <span class="cls">ddl-auto</span>: <span class="str">create-drop</span>
+    <span class="cls">show-sql</span>: <span class="kw">false</span>
+
+<span class="cmt"># Disable Axon Server auto-connect (use embedded event store)</span>
+<span class="cls">axon</span>:
+  <span class="cls">axonserver</span>:
+    <span class="cls">enabled</span>: <span class="kw">false</span></pre>
+    </div>
+
+    <div class="callout callout-tip">
+      <div class="callout-icon">💡</div>
+      <p><strong>axon.axonserver.enabled: false</strong> tells Axon Framework to use the embedded JPA event store instead of connecting to Axon Server. Perfect for local development without external infrastructure.</p>
+    </div>
+
+    <div class="step-footer">
+      <button class="btn-primary" onclick="markDone(0)">Mark Complete ✓</button>
+      <button class="btn-secondary" onclick="navigate(1)">Next Step →</button>
+      <span class="step-of">Step 1 of 12</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- STEP 2 — DOMAIN MODEL -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="step-page" id="step-1">
+    <div class="step-hero">
+      <div class="step-badge badge-lime"><span class="badge-num">02</span><span class="badge-label">domain</span></div>
+      <div class="step-hero-text">
+        <h2>Domain Model — What Are We Building?</h2>
+        <p>Before writing any Axon code, understand the domain: an Order with a lifecycle from creation to shipping.</p>
+      </div>
+    </div>
+
+    <div class="explain-block">
+      <h3>📦 The Order Domain</h3>
+      <p>Our <strong>Order</strong> aggregate has a simple lifecycle:</p>
+      <p><strong>CREATED → CONFIRMED → SHIPPED</strong></p>
+      <p>Each state transition is triggered by a <strong>Command</strong> and recorded as an <strong>Event</strong>. The aggregate enforces business rules — for example, you cannot ship an order that hasn't been confirmed.</p>
+    </div>
+
+    <div class="flow-diagram" style="flex-direction:column;gap:1rem;">
+      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:center;">
+        <div class="flow-box fb-orange">CreateOrderCommand</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box fb-purple">OrderCreatedEvent</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box fb-green">status = CREATED</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:center;">
+        <div class="flow-box fb-orange">ConfirmOrderCommand</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box fb-purple">OrderConfirmedEvent</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box fb-green">status = CONFIRMED</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:center;">
+        <div class="flow-box fb-orange">ShipOrderCommand</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box fb-purple">OrderShippedEvent</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box fb-green">status = SHIPPED</div>
+      </div>
+    </div>
+
+    <div class="code-section">
+      <div class="code-file-header">
+        <div class="file-dot fd-red"></div><div class="file-dot fd-yellow"></div><div class="file-dot fd-green"></div>
+        <span class="file-name">OrderStatus.java</span><span class="file-lang">Java</span>
+        <button class="copy-code-btn" onclick="copyCode(this)">copy</button>
+      </div>
+      <pre class="code-block"><span class="kw">package</span> <span class="pkg">com.example.order.domain</span>;
+
+<span class="kw">public enum</span> <span class="cls">OrderStatus</span> {
+    <span class="num">CREATED</span>,
+    <span class="num">CONFIRMED</span>,
+    <span class="num">SHIPPED</span>
+}</pre>
+    </div>
+
+    <div class="callout callout-info">
+      <div class="callout-icon">ℹ️</div>
+      <p>In DDD (Domain Driven Design), an <strong>Aggregate</strong> is a consistency boundary. The <strong>Order</strong> is our aggregate root — all business rules are enforced here, and it's the only way to change order state.</p>
+    </div>
+
+    <div class="step-footer">
+      <button class="btn-primary" onclick="markDone(1)">Mark Complete ✓</button>
+      <button class="btn-secondary" onclick="navigate(1)">Next Step →</button>
+      <span class="step-of">Step 2 of 12</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- STEP 3 — COMMANDS -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="step-page" id="step-2">
+    <div class="step-hero">
+      <div class="step-badge badge-orange"><span class="badge-num">03</span><span class="badge-label">command</span></div>
+      <div class="step-hero-text">
+        <h2>Commands — Express Intent</h2>
+        <p>Commands are imperative messages that express <em>what you want to happen</em>. They are the entry point to the write side.</p>
+      </div>
+    </div>
+
+    <div class="explain-block">
+      <h3>📨 What is a Command?</h3>
+      <p>A command is a simple <strong>immutable data object</strong> (record or class with final fields). It is named in the <strong>imperative tense</strong>: <em>CreateOrder</em>, <em>ConfirmOrder</em>, <em>ShipOrder</em>.</p>
+      <p>The most important field is the <strong>@TargetAggregateIdentifier</strong> — this tells Axon which aggregate instance should receive the command.</p>
+    </div>
+
+    <div class="code-section">
+      <div class="code-file-header">
+        <div class="file-dot fd-red"></div><div class="file-dot fd-yellow"></div><div class="file-dot fd-green"></div>
+        <span class="file-name">CreateOrderCommand.java</span><span class="file-lang">Java</span>
+        <button class="copy-code-btn" onclick="copyCode(this)">copy</button>
+      </div>
+      <pre class="code-block"><span class="kw">package</span> <span class="pkg">com.example.order.command</span>;
+
+<span class="kw">import</span> <span class="pkg">org.axonframework.modelling.command.TargetAggregateIdentifier</span>;
+<span class="kw">import</span> <span class="pkg">java.math.BigDecimal</span>;
+
+<span class="kw">public record</span> <span class="cls">CreateOrderCommand</span>(
+
+    <span class="ann">@TargetAggregateIdentifier</span>   <span class="cmt">// ① tells Axon which aggregate to route to</span>
+    <span class="cls">String</span> orderId,
+
+    <span class="cls">String</span> customerId,            <span class="cmt">// ② who placed the order</span>
+    <span class="cls">BigDecimal</span> totalAmount        <span class="cmt">// ③ order value</span>
+) {}
+
+
+<span class="cmt">// ─────────────────────────────────────────────────</span>
+
+<span class="kw">public record</span> <span class="cls">ConfirmOrderCommand</span>(
+
+    <span class="ann">@TargetAggregateIdentifier</span>
+    <span class="cls">String</span> orderId               <span class="cmt">// just the ID to confirm</span>
+) {}
+
+
+<span class="cmt">// ─────────────────────────────────────────────────</span>
+
+<span class="kw">public record</span> <span class="cls">ShipOrderCommand</span>(
+
+    <span class="ann">@TargetAggregateIdentifier</span>
+    <span class="cls">String</span> orderId,
+
+    <span class="cls">String</span> shippingAddress        <span class="cmt">// where to ship</span>
+) {}</pre>
+    </div>
+
+    <div style="margin-bottom:1.5rem;">
+      <div class="ann-line"><div class="ann-num">①</div><div class="ann-text"><strong>@TargetAggregateIdentifier</strong> — Required! Axon uses this field value to find (or create) the correct aggregate instance in the repository.</div></div>
+      <div class="ann-line"><div class="ann-num">②</div><div class="ann-text">Commands carry all the <strong>data needed</strong> to perform the action. Think of them as a structured intent.</div></div>
+      <div class="ann-line"><div class="ann-num">③</div><div class="ann-text">Using Java <strong>records</strong> makes commands naturally immutable — perfect for CQRS.</div></div>
+    </div>
+
+    <div class="callout callout-warn">
+      <div class="callout-icon">⚠️</div>
+      <p><strong>Rule:</strong> Commands must be serializable (Axon serializes them when dispatching). Records with primitive/String fields work out of the box. Use Lombok @Value as an alternative.</p>
+    </div>
+
+    <div class="step-footer">
+      <button class="btn-primary" onclick="markDone(2)">Mark Complete ✓</button>
+      <button class="btn-secondary" onclick="navigate(1)">Next Step →</button>
+      <span class="step-of">Step 3 of 12</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- STEP 4 — EVENTS -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="step-page" id="step-3">
+    <div class="step-hero">
+      <div class="step-badge badge-purple"><span class="badge-num">04</span><span class="badge-label">events</span></div>
+      <div class="step-hero-text">
+        <h2>Events — Facts That Happened</h2>
+        <p>Events record <em>what happened</em> in the domain. They are past-tense, immutable, and stored forever in the event store.</p>
+      </div>
+    </div>
+
+    <div class="explain-block">
+      <h3>📜 What is an Event?</h3>
+      <p>Events are <strong>facts</strong> — they describe something that <em>already occurred</em>. Unlike commands, events <strong>cannot be rejected</strong>. Once published, they are persisted and broadcast.</p>
+      <p>Events are the <strong>source of truth</strong> in Event Sourcing. The aggregate state is rebuilt by replaying them in order.</p>
+    </div>
+
+    <div class="code-section">
+      <div class="code-file-header">
+        <div class="file-dot fd-red"></div><div class="file-dot fd-yellow"></div><div class="file-dot fd-green"></div>
+        <span class="file-name">OrderEvents.java</span><span class="file-lang">Java</span>
+        <button class="copy-code-btn" onclick="copyCode(this)">copy</button>
+      </div>
+      <pre class="code-block"><span class="kw">package</span> <span class="pkg">com.example.order.event</span>;
+
+<span class="kw">import</span> <span class="pkg">java.math.BigDecimal</span>;
+
+<span class="cmt">/**
+ * ① Past tense naming: OrderCREATED, OrderCONFIRMED, OrderSHIPPED
+ * ② All fields final — events are IMMUTABLE
+ * ③ Every event carries the aggregate ID for correlation
+ */</span>
+
+<span class="kw">public record</span> <span class="cls">OrderCreatedEvent</span>(
+    <span class="cls">String</span> orderId,
+    <span class="cls">String</span> customerId,
+    <span class="cls">BigDecimal</span> totalAmount
+) {}
+
+
+<span class="kw">public record</span> <span class="cls">OrderConfirmedEvent</span>(
+    <span class="cls">String</span> orderId
+) {}
+
+
+<span class="kw">public record</span> <span class="cls">OrderShippedEvent</span>(
+    <span class="cls">String</span> orderId,
+    <span class="cls">String</span> shippingAddress
+) {}</pre>
+    </div>
+
+    <div style="margin-bottom:1.5rem;">
+      <div class="ann-line"><div class="ann-num">①</div><div class="ann-text"><strong>Past-tense naming</strong> — OrderCreated (not CreateOrder). This makes it clear: this is a fact, not a request.</div></div>
+      <div class="ann-line"><div class="ann-num">②</div><div class="ann-text"><strong>Immutable</strong> — events must never change after creation. Records guarantee this in Java.</div></div>
+      <div class="ann-line"><div class="ann-num">③</div><div class="ann-text">Always include <strong>orderId</strong> — projections and sagas need it to know which order this event belongs to.</div></div>
+    </div>
+
+    <div class="callout callout-tip">
+      <div class="callout-icon">💡</div>
+      <p><strong>Event Sourcing key insight:</strong> There is no UPDATE or DELETE in your database. Instead, you store <em>what happened</em>. The current state of an Order is always computed by replaying all its events from the beginning.</p>
+    </div>
+
+    <div class="step-footer">
+      <button class="btn-primary" onclick="markDone(3)">Mark Complete ✓</button>
+      <button class="btn-secondary" onclick="navigate(1)">Next Step →</button>
+      <span class="step-of">Step 4 of 12</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- STEP 5 — AGGREGATE -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="step-page" id="step-4">
+    <div class="step-hero">
+      <div class="step-badge badge-sky"><span class="badge-num">05</span><span class="badge-label">aggregate</span></div>
+      <div class="step-hero-text">
+        <h2>The Aggregate — Write Side Core</h2>
+        <p>The aggregate is the heart of the write side. It enforces business rules and produces events in response to commands.</p>
+      </div>
+    </div>
+
+    <div class="explain-block">
+      <h3>🏛️ What is an Aggregate in Axon?</h3>
+      <p>An Axon <strong>@Aggregate</strong> is a DDD aggregate root that Axon manages. It receives commands, validates business rules, and publishes events using <code>AggregateLifecycle.apply()</code>.</p>
+      <p>Its <strong>state is never saved directly to a database</strong>. Instead, Axon stores the events and rebuilds state by replaying them via <code>@EventSourcingHandler</code> methods.</p>
+    </div>
+
+    <div class="code-section">
+      <div class="code-file-header">
+        <div class="file-dot fd-red"></div><div class="file-dot fd-yellow"></div><div class="file-dot fd-green"></div>
+        <span class="file-name">OrderAggregate.java</span><span class="file-lang">Java</span>
+        <button class="copy-code-btn" onclick="copyCode(this)">copy</button>
+      </div>
+      <pre class="code-block"><span class="kw">package</span> <span class="pkg">com.example.order.aggregate</span>;
+
+<span class="kw">import</span> <span class="pkg">org.axonframework.commandhandling.CommandHandler</span>;
+<span class="kw">import</span> <span class="pkg">org.axonframework.eventsourcing.EventSourcingHandler</span>;
+<span class="kw">import</span> <span class="pkg">org.axonframework.modelling.command.AggregateIdentifier</span>;
+<span class="kw">import static</span> <span class="pkg">org.axonframework.modelling.command.AggregateLifecycle.apply</span>;
+<span class="kw">import</span> <span class="pkg">org.axonframework.spring.stereotype.Aggregate</span>;
+
+<span class="ann">@Aggregate</span>                       <span class="cmt">// ① Mark as Axon-managed aggregate</span>
+<span class="kw">public class</span> <span class="cls">OrderAggregate</span> {
+
+    <span class="ann">@AggregateIdentifier</span>         <span class="cmt">// ② The unique ID of this aggregate instance</span>
+    <span class="kw">private</span> <span class="cls">String</span> orderId;
+
+    <span class="kw">private</span> <span class="cls">OrderStatus</span> status;   <span class="cmt">// ③ State — ONLY mutated in @EventSourcingHandler</span>
+
+    <span class="cmt">// ④ Required no-arg constructor for Axon to instantiate during replay</span>
+    <span class="kw">protected</span> <span class="fn">OrderAggregate</span>() {}
+
+    <span class="cmt">// ════════════════════════════════
+    // COMMAND HANDLERS
+    // ════════════════════════════════</span>
+
+    <span class="ann">@CommandHandler</span>               <span class="cmt">// ⑤ Handles CreateOrderCommand → produces event</span>
+    <span class="kw">public</span> <span class="fn">OrderAggregate</span>(<span class="cls">CreateOrderCommand</span> cmd) {
+        <span class="cmt">// Validate business rules here ↓</span>
+        <span class="kw">if</span> (cmd.totalAmount().<span class="fn">signum</span>() &lt;= <span class="num">0</span>) {
+            <span class="kw">throw new</span> <span class="cls">IllegalArgumentException</span>(<span class="str">"Amount must be positive"</span>);
+        }
+        <span class="cmt">// Publish event — do NOT set state here directly!</span>
+        <span class="fn">apply</span>(<span class="kw">new</span> <span class="cls">OrderCreatedEvent</span>(
+            cmd.orderId(), cmd.customerId(), cmd.totalAmount()
+        ));
+    }
+
+    <span class="ann">@CommandHandler</span>
+    <span class="kw">public void</span> <span class="fn">handle</span>(<span class="cls">ConfirmOrderCommand</span> cmd) {
+        <span class="kw">if</span> (status != <span class="cls">OrderStatus</span>.CREATED) {         <span class="cmt">// ⑥ Enforce invariant</span>
+            <span class="kw">throw new</span> <span class="cls">IllegalStateException</span>(<span class="str">"Only CREATED orders can be confirmed"</span>);
+        }
+        <span class="fn">apply</span>(<span class="kw">new</span> <span class="cls">OrderConfirmedEvent</span>(cmd.orderId()));
+    }
+
+    <span class="ann">@CommandHandler</span>
+    <span class="kw">public void</span> <span class="fn">handle</span>(<span class="cls">ShipOrderCommand</span> cmd) {
+        <span class="kw">if</span> (status != <span class="cls">OrderStatus</span>.CONFIRMED) {         <span class="cmt">// ⑥ Another invariant</span>
+            <span class="kw">throw new</span> <span class="cls">IllegalStateException</span>(<span class="str">"Only CONFIRMED orders can be shipped"</span>);
+        }
+        <span class="fn">apply</span>(<span class="kw">new</span> <span class="cls">OrderShippedEvent</span>(cmd.orderId(), cmd.shippingAddress()));
+    }
+}</pre>
+    </div>
+
+    <div style="margin-bottom:1.5rem;">
+      <div class="ann-line"><div class="ann-num">①</div><div class="ann-text"><strong>@Aggregate</strong> — Registers this class with Axon's repository. Axon handles loading, saving, and routing automatically.</div></div>
+      <div class="ann-line"><div class="ann-num">②</div><div class="ann-text"><strong>@AggregateIdentifier</strong> — This field is used by the CommandBus to route commands to the exact aggregate instance.</div></div>
+      <div class="ann-line"><div class="ann-num">③</div><div class="ann-text">State fields (<code>status</code>) are only ever set inside <strong>@EventSourcingHandler</strong> methods — never in command handlers.</div></div>
+      <div class="ann-line"><div class="ann-num">④</div><div class="ann-text">The <strong>no-arg constructor</strong> is required by Axon to instantiate the aggregate before replaying events during hydration.</div></div>
+      <div class="ann-line"><div class="ann-num">⑤</div><div class="ann-text"><strong>Constructor @CommandHandler</strong> — used for the creation command. Instance @CommandHandlers are for subsequent commands.</div></div>
+      <div class="ann-line"><div class="ann-num">⑥</div><div class="ann-text"><strong>Business invariants</strong> — guard clauses ensure business rules are enforced before any event is emitted.</div></div>
+    </div>
+
+    <div class="step-footer">
+      <button class="btn-primary" onclick="markDone(4)">Mark Complete ✓</button>
+      <button class="btn-secondary" onclick="navigate(1)">Next Step →</button>
+      <span class="step-of">Step 5 of 12</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- STEP 6 — EVENT SOURCING HANDLER -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="step-page" id="step-5">
+    <div class="step-hero">
+      <div class="step-badge badge-sky"><span class="badge-num">06</span><span class="badge-label">cmd handler</span></div>
+      <div class="step-hero-text">
+        <h2>Command Handler Flow — How It Works</h2>
+        <p>Let's trace exactly what happens when you dispatch a CreateOrderCommand through Axon.</p>
+      </div>
+    </div>
+
+    <div class="explain-block">
+      <h3>🔄 The Command → Event Flow</h3>
+      <p>When you call <code>commandGateway.send(new CreateOrderCommand(...))</code>, here is what Axon does internally — step by step:</p>
+    </div>
+
+    <div class="flow-diagram" style="flex-direction:column;align-items:flex-start;gap:.7rem;font-size:.73rem;">
+      <div style="display:flex;align-items:center;gap:.6rem;width:100%;">
+        <div class="flow-box fb-lime" style="min-width:140px;text-align:center;">① CommandGateway<br>.send(command)</div>
+        <div class="flow-arrow">→</div>
+        <div style="color:var(--muted2);font-size:.7rem;">Wraps command in a CommandMessage and dispatches to CommandBus</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.6rem;width:100%;">
+        <div class="flow-box fb-orange" style="min-width:140px;text-align:center;">② CommandBus<br>routes command</div>
+        <div class="flow-arrow">→</div>
+        <div style="color:var(--muted2);font-size:.7rem;">Reads @TargetAggregateIdentifier, finds the matching @CommandHandler method</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.6rem;width:100%;">
+        <div class="flow-box fb-sky" style="min-width:140px;text-align:center;">③ Repository<br>loads aggregate</div>
+        <div class="flow-arrow">→</div>
+        <div style="color:var(--muted2);font-size:.7rem;">For existing aggregates: loads from event store and replays events</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.6rem;width:100%;">
+        <div class="flow-box fb-sky" style="min-width:140px;text-align:center;">④ @CommandHandler<br>executes</div>
+        <div class="flow-arrow">→</div>
+        <div style="color:var(--muted2);font-size:.7rem;">Business rules validated, AggregateLifecycle.apply(event) called</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.6rem;width:100%;">
+        <div class="flow-box fb-purple" style="min-width:140px;text-align:center;">⑤ Event persisted<br>+ published</div>
+        <div class="flow-arrow">→</div>
+        <div style="color:var(--muted2);font-size:.7rem;">Axon saves event to event store AND calls @EventSourcingHandler immediately</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.6rem;width:100%;">
+        <div class="flow-box fb-green" style="min-width:140px;text-align:center;">⑥ @EventHandler<br>on projection</div>
+        <div class="flow-arrow">→</div>
+        <div style="color:var(--muted2);font-size:.7rem;">EventBus delivers event to projections/sagas asynchronously</div>
+      </div>
+    </div>
+
+    <div class="callout callout-tip">
+      <div class="callout-icon">💡</div>
+      <p><strong>Golden rule:</strong> Command handlers only call <code>apply()</code>. They never set <code>this.status = ...</code> directly. State changes happen <em>exclusively</em> in @EventSourcingHandler methods. This is what makes event sourcing work.</p>
+    </div>
+
+    <div class="step-footer">
+      <button class="btn-primary" onclick="markDone(5)">Mark Complete ✓</button>
+      <button class="btn-secondary" onclick="navigate(1)">Next Step →</button>
+      <span class="step-of">Step 6 of 12</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- STEP 7 — EVENT SOURCING HANDLER -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="step-page" id="step-6">
+    <div class="step-hero">
+      <div class="step-badge badge-purple"><span class="badge-num">07</span><span class="badge-label">ES handler</span></div>
+      <div class="step-hero-text">
+        <h2>@EventSourcingHandler — Rebuilding State</h2>
+        <p>These methods are the only place where aggregate state is mutated. They run during both command processing AND event replay.</p>
+      </div>
+    </div>
+
+    <div class="explain-block">
+      <h3>🔁 The Event Sourcing Handler</h3>
+      <p>When Axon stores an event (via <code>apply()</code>), it immediately calls the matching <code>@EventSourcingHandler</code> to update the aggregate's in-memory state. When Axon later needs to <strong>reload</strong> the aggregate, it replays all stored events through these same handlers — no database reads for state, just event replay.</p>
+    </div>
+
+    <div class="code-section">
+      <div class="code-file-header">
+        <div class="file-dot fd-red"></div><div class="file-dot fd-yellow"></div><div class="file-dot fd-green"></div>
+        <span class="file-name">OrderAggregate.java — continued</span><span class="file-lang">Java</span>
+        <button class="copy-code-btn" onclick="copyCode(this)">copy</button>
+      </div>
+      <pre class="code-block"><span class="cmt">// Add these methods INSIDE OrderAggregate class</span>
+<span class="cmt">// (after the @CommandHandler methods)</span>
+
+<span class="cmt">// ════════════════════════════════
+// EVENT SOURCING HANDLERS
+// State mutation happens ONLY here
+// ════════════════════════════════</span>
+
+<span class="ann">@EventSourcingHandler</span>            <span class="cmt">// ① Called when OrderCreatedEvent is applied</span>
+<span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">OrderCreatedEvent</span> event) {
+    <span class="kw">this</span>.orderId  = event.<span class="fn">orderId</span>();   <span class="cmt">// ② Set the aggregate ID</span>
+    <span class="kw">this</span>.status   = <span class="cls">OrderStatus</span>.CREATED; <span class="cmt">// ③ Set initial state</span>
+}
+
+<span class="ann">@EventSourcingHandler</span>
+<span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">OrderConfirmedEvent</span> event) {
+    <span class="kw">this</span>.status = <span class="cls">OrderStatus</span>.CONFIRMED; <span class="cmt">// ④ Transition state</span>
+}
+
+<span class="ann">@EventSourcingHandler</span>
+<span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">OrderShippedEvent</span> event) {
+    <span class="kw">this</span>.status = <span class="cls">OrderStatus</span>.SHIPPED;  <span class="cmt">// ④ Transition state</span>
+}</pre>
+    </div>
+
+    <div style="margin-bottom:1.5rem;">
+      <div class="ann-line"><div class="ann-num">①</div><div class="ann-text"><strong>@EventSourcingHandler</strong> — matched by event type. Axon calls the right handler automatically based on the event class.</div></div>
+      <div class="ann-line"><div class="ann-num">②</div><div class="ann-text">The <strong>first handler</strong> must set <code>this.orderId</code> — Axon needs it to correlate the aggregate identity during replay.</div></div>
+      <div class="ann-line"><div class="ann-num">③④</div><div class="ann-text">Only <strong>state mutations</strong> here — no business logic, no validation, no side effects. Keep these methods simple and pure.</div></div>
+    </div>
+
+    <div class="callout callout-info">
+      <div class="callout-icon">ℹ️</div>
+      <p>During <strong>event replay</strong> (e.g., loading an existing order), Axon calls the <code>@EventSourcingHandler</code> methods in sequence for every stored event. After replaying all 3 events above, the aggregate's <code>status</code> will be <code>SHIPPED</code> — the correct current state.</p>
+    </div>
+
+    <div class="step-footer">
+      <button class="btn-primary" onclick="markDone(6)">Mark Complete ✓</button>
+      <button class="btn-secondary" onclick="navigate(1)">Next Step →</button>
+      <span class="step-of">Step 7 of 12</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- STEP 8 — PROJECTION -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="step-page" id="step-7">
+    <div class="step-hero">
+      <div class="step-badge badge-lime2"><span class="badge-num">08</span><span class="badge-label">projection</span></div>
+      <div class="step-hero-text">
+        <h2>Projection — Building the Read Model</h2>
+        <p>Projections listen to events and build a query-optimized view. This is the read side of CQRS.</p>
+      </div>
+    </div>
+
+    <div class="explain-block">
+      <h3>📊 What is a Projection?</h3>
+      <p>A projection is a Spring <strong>@Component</strong> that uses <strong>@EventHandler</strong> to listen to domain events and update a read model (a JPA entity, Redis hash, Elasticsearch document, etc.).</p>
+      <p>It has <strong>no business logic</strong> — it just transforms events into a format optimized for querying.</p>
+    </div>
+
+    <div class="code-section">
+      <div class="code-file-header">
+        <div class="file-dot fd-red"></div><div class="file-dot fd-yellow"></div><div class="file-dot fd-green"></div>
+        <span class="file-name">OrderView.java</span><span class="file-lang">Java — Read Model Entity</span>
+        <button class="copy-code-btn" onclick="copyCode(this)">copy</button>
+      </div>
+      <pre class="code-block"><span class="ann">@Entity</span>
+<span class="ann">@Table</span>(name = <span class="str">"order_view"</span>)
+<span class="kw">public class</span> <span class="cls">OrderView</span> {
+
+    <span class="ann">@Id</span>
+    <span class="kw">private</span> <span class="cls">String</span> orderId;
+    <span class="kw">private</span> <span class="cls">String</span> customerId;
+    <span class="kw">private</span> <span class="cls">BigDecimal</span> totalAmount;
+    <span class="kw">private</span> <span class="cls">String</span> status;
+    <span class="kw">private</span> <span class="cls">String</span> shippingAddress;
+
+    <span class="cmt">// constructors, getters, setters...</span>
+}</pre>
+    </div>
+
+    <div class="code-section">
+      <div class="code-file-header">
+        <div class="file-dot fd-red"></div><div class="file-dot fd-yellow"></div><div class="file-dot fd-green"></div>
+        <span class="file-name">OrderProjection.java</span><span class="file-lang">Java</span>
+        <button class="copy-code-btn" onclick="copyCode(this)">copy</button>
+      </div>
+      <pre class="code-block"><span class="ann">@Component</span>
+<span class="ann">@ProcessingGroup</span>(<span class="str">"order-projection"</span>)   <span class="cmt">// ① Logical group name for this processor</span>
+<span class="kw">public class</span> <span class="cls">OrderProjection</span> {
+
+    <span class="kw">private final</span> <span class="cls">OrderViewRepository</span> repo;
+
+    <span class="kw">public</span> <span class="fn">OrderProjection</span>(<span class="cls">OrderViewRepository</span> repo) {
+        <span class="kw">this</span>.repo = repo;
+    }
+
+    <span class="ann">@EventHandler</span>                          <span class="cmt">// ② Reacts to OrderCreatedEvent</span>
+    <span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">OrderCreatedEvent</span> e) {
+        <span class="kw">var</span> view = <span class="kw">new</span> <span class="cls">OrderView</span>();
+        view.<span class="fn">setOrderId</span>(e.<span class="fn">orderId</span>());
+        view.<span class="fn">setCustomerId</span>(e.<span class="fn">customerId</span>());
+        view.<span class="fn">setTotalAmount</span>(e.<span class="fn">totalAmount</span>());
+        view.<span class="fn">setStatus</span>(<span class="str">"CREATED"</span>);
+        repo.<span class="fn">save</span>(view);                    <span class="cmt">// ③ Persist to read DB</span>
+    }
+
+    <span class="ann">@EventHandler</span>
+    <span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">OrderConfirmedEvent</span> e) {
+        repo.<span class="fn">findById</span>(e.<span class="fn">orderId</span>())
+            .<span class="fn">ifPresent</span>(view -> {
+                view.<span class="fn">setStatus</span>(<span class="str">"CONFIRMED"</span>);
+                repo.<span class="fn">save</span>(view);
+            });
+    }
+
+    <span class="ann">@EventHandler</span>
+    <span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">OrderShippedEvent</span> e) {
+        repo.<span class="fn">findById</span>(e.<span class="fn">orderId</span>())
+            .<span class="fn">ifPresent</span>(view -> {
+                view.<span class="fn">setStatus</span>(<span class="str">"SHIPPED"</span>);
+                view.<span class="fn">setShippingAddress</span>(e.<span class="fn">shippingAddress</span>());
+                repo.<span class="fn">save</span>(view);
+            });
+    }
+}</pre>
+    </div>
+
+    <div style="margin-bottom:1.5rem;">
+      <div class="ann-line"><div class="ann-num">①</div><div class="ann-text"><strong>@ProcessingGroup</strong> — groups this handler into a named processor. You can configure threading and reset behavior per group.</div></div>
+      <div class="ann-line"><div class="ann-num">②</div><div class="ann-text"><strong>@EventHandler</strong> — Axon delivers events here asynchronously. This is the read side reacting to write side changes.</div></div>
+      <div class="ann-line"><div class="ann-num">③</div><div class="ann-text">The projection writes to a <strong>separate read database</strong>. Queries hit this table, never the event store. This is CQRS in action.</div></div>
+    </div>
+
+    <div class="step-footer">
+      <button class="btn-primary" onclick="markDone(7)">Mark Complete ✓</button>
+      <button class="btn-secondary" onclick="navigate(1)">Next Step →</button>
+      <span class="step-of">Step 8 of 12</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- STEP 9 — QUERY HANDLER -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="step-page" id="step-8">
+    <div class="step-hero">
+      <div class="step-badge badge-lime2"><span class="badge-num">09</span><span class="badge-label">query</span></div>
+      <div class="step-hero-text">
+        <h2>Queries &amp; Query Handlers</h2>
+        <p>Queries are the read side of CQRS. They fetch data from the projection — never from the event store.</p>
+      </div>
+    </div>
+
+    <div class="code-section">
+      <div class="code-file-header">
+        <div class="file-dot fd-red"></div><div class="file-dot fd-yellow"></div><div class="file-dot fd-green"></div>
+        <span class="file-name">OrderQueries.java + handlers</span><span class="file-lang">Java</span>
+        <button class="copy-code-btn" onclick="copyCode(this)">copy</button>
+      </div>
+      <pre class="code-block"><span class="cmt">// ── Query objects ────────────────────────────────────</span>
+<span class="kw">public record</span> <span class="cls">FindOrderByIdQuery</span>(<span class="cls">String</span> orderId) {}
+<span class="kw">public record</span> <span class="cls">FindAllOrdersQuery</span>() {}
+
+
+<span class="cmt">// ── Add these to OrderProjection.java ────────────────</span>
+
+<span class="ann">@QueryHandler</span>                      <span class="cmt">// ① Handles FindOrderByIdQuery</span>
+<span class="kw">public</span> <span class="cls">OrderView</span> <span class="fn">handle</span>(<span class="cls">FindOrderByIdQuery</span> query) {
+    <span class="kw">return</span> repo.<span class="fn">findById</span>(query.<span class="fn">orderId</span>())
+               .<span class="fn">orElseThrow</span>(() ->
+                   <span class="kw">new</span> <span class="cls">IllegalArgumentException</span>(<span class="str">"Order not found"</span>));
+}
+
+<span class="ann">@QueryHandler</span>                      <span class="cmt">// ② Handles FindAllOrdersQuery</span>
+<span class="kw">public</span> <span class="cls">List</span>&lt;<span class="cls">OrderView</span>&gt; <span class="fn">handle</span>(<span class="cls">FindAllOrdersQuery</span> query) {
+    <span class="kw">return</span> repo.<span class="fn">findAll</span>();
+}</pre>
+    </div>
+
+    <div class="callout callout-info">
+      <div class="callout-icon">ℹ️</div>
+      <p>Queries are dispatched via <strong>QueryGateway</strong>, not CommandGateway. The QueryGateway routes the query object to the matching <strong>@QueryHandler</strong> method by type — just like commands.</p>
+    </div>
+
+    <div class="step-footer">
+      <button class="btn-primary" onclick="markDone(8)">Mark Complete ✓</button>
+      <button class="btn-secondary" onclick="navigate(1)">Next Step →</button>
+      <span class="step-of">Step 9 of 12</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- STEP 10 — SAGA -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="step-page" id="step-9">
+    <div class="step-hero">
+      <div class="step-badge badge-orange"><span class="badge-num">10</span><span class="badge-label">saga</span></div>
+      <div class="step-hero-text">
+        <h2>Saga — Long-Running Process Orchestration</h2>
+        <p>A Saga coordinates a multi-step business process that spans multiple aggregates or services over time.</p>
+      </div>
+    </div>
+
+    <div class="explain-block">
+      <h3>🎭 What is a Saga?</h3>
+      <p>A Saga is a <strong>stateful event listener</strong> that reacts to events and dispatches commands to drive a process forward. In our example: when an order is created, the saga automatically sends a payment request.</p>
+    </div>
+
+    <div class="code-section">
+      <div class="code-file-header">
+        <div class="file-dot fd-red"></div><div class="file-dot fd-yellow"></div><div class="file-dot fd-green"></div>
+        <span class="file-name">OrderProcessingSaga.java</span><span class="file-lang">Java</span>
+        <button class="copy-code-btn" onclick="copyCode(this)">copy</button>
+      </div>
+      <pre class="code-block"><span class="ann">@Saga</span>                                    <span class="cmt">// ① Mark as Axon Saga</span>
+<span class="kw">public class</span> <span class="cls">OrderProcessingSaga</span> {
+
+    <span class="ann">@Autowired</span>
+    <span class="kw">private transient</span> <span class="cls">CommandGateway</span> commandGateway; <span class="cmt">// ② transient = not stored</span>
+
+    <span class="kw">private</span> <span class="cls">String</span> orderId;
+
+    <span class="ann">@StartSaga</span>                             <span class="cmt">// ③ Creates new saga instance</span>
+    <span class="ann">@SagaEventHandler</span>(associationProperty = <span class="str">"orderId"</span>)
+    <span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">OrderCreatedEvent</span> event) {
+        <span class="kw">this</span>.orderId = event.<span class="fn">orderId</span>();
+        <span class="cmt">// Saga sends a command to another aggregate/service</span>
+        commandGateway.<span class="fn">send</span>(<span class="kw">new</span> <span class="cls">ConfirmOrderCommand</span>(event.<span class="fn">orderId</span>()));
+        <span class="cmt">// In real life: send RequestPaymentCommand to PaymentAggregate</span>
+    }
+
+    <span class="ann">@SagaEventHandler</span>(associationProperty = <span class="str">"orderId"</span>)
+    <span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">OrderConfirmedEvent</span> event) {
+        <span class="cmt">// React to confirmation — maybe trigger shipping prep</span>
+        commandGateway.<span class="fn">send</span>(
+            <span class="kw">new</span> <span class="cls">ShipOrderCommand</span>(event.<span class="fn">orderId</span>(), <span class="str">"Default Warehouse"</span>)
+        );
+    }
+
+    <span class="ann">@EndSaga</span>                               <span class="cmt">// ④ Marks saga as complete → cleaned up</span>
+    <span class="ann">@SagaEventHandler</span>(associationProperty = <span class="str">"orderId"</span>)
+    <span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">OrderShippedEvent</span> event) {
+        <span class="cmt">// Process complete! Saga instance is removed from saga store.</span>
+    }
+}</pre>
+    </div>
+
+    <div style="margin-bottom:1.5rem;">
+      <div class="ann-line"><div class="ann-num">①</div><div class="ann-text"><strong>@Saga</strong> — tells Axon this is a saga. Axon persists saga state in the saga store between events.</div></div>
+      <div class="ann-line"><div class="ann-num">②</div><div class="ann-text"><strong>transient</strong> — Spring-injected dependencies must be transient so they are not serialized with the saga state.</div></div>
+      <div class="ann-line"><div class="ann-num">③</div><div class="ann-text"><strong>@StartSaga</strong> — creates a new saga instance. <code>associationProperty</code> links this saga to a specific orderId.</div></div>
+      <div class="ann-line"><div class="ann-num">④</div><div class="ann-text"><strong>@EndSaga</strong> — marks the saga complete. Axon removes it from the saga store, freeing resources.</div></div>
+    </div>
+
+    <div class="step-footer">
+      <button class="btn-primary" onclick="markDone(9)">Mark Complete ✓</button>
+      <button class="btn-secondary" onclick="navigate(1)">Next Step →</button>
+      <span class="step-of">Step 10 of 12</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- STEP 11 — SNAPSHOTS -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="step-page" id="step-10">
+    <div class="step-hero">
+      <div class="step-badge badge-sky"><span class="badge-num">11</span><span class="badge-label">snapshots</span></div>
+      <div class="step-hero-text">
+        <h2>Snapshots — Performance Optimization</h2>
+        <p>As aggregates accumulate hundreds of events, replaying all of them on each load becomes slow. Snapshots solve this.</p>
+      </div>
+    </div>
+
+    <div class="explain-block">
+      <h3>📸 How Snapshots Work</h3>
+      <p>A snapshot captures the <strong>full aggregate state</strong> at a given event sequence number. On next load, Axon loads the snapshot + only the events <em>after</em> the snapshot — skipping potentially thousands of old events.</p>
+    </div>
+
+    <div class="code-section">
+      <div class="code-file-header">
+        <div class="file-dot fd-red"></div><div class="file-dot fd-yellow"></div><div class="file-dot fd-green"></div>
+        <span class="file-name">AxonConfig.java</span><span class="file-lang">Java — Snapshot Configuration</span>
+        <button class="copy-code-btn" onclick="copyCode(this)">copy</button>
+      </div>
+      <pre class="code-block"><span class="ann">@Configuration</span>
+<span class="kw">public class</span> <span class="cls">AxonConfig</span> {
+
+    <span class="cmt">/**
+     * Take a snapshot every 50 events applied to an aggregate.
+     * After 50 events → snapshot stored → next load uses snapshot + new events only.
+     */</span>
+    <span class="ann">@Bean</span>
+    <span class="kw">public</span> <span class="cls">SnapshotTriggerDefinition</span> <span class="fn">orderSnapshotTrigger</span>(
+            <span class="cls">Snapshotter</span> snapshotter) {
+
+        <span class="kw">return new</span> <span class="cls">EventCountSnapshotTriggerDefinition</span>(
+                snapshotter,
+                <span class="num">50</span>              <span class="cmt">// ← snapshot after every 50 events</span>
+        );
+    }
+}</pre>
+    </div>
+
+    <div class="code-section">
+      <div class="code-file-header">
+        <div class="file-dot fd-red"></div><div class="file-dot fd-yellow"></div><div class="file-dot fd-green"></div>
+        <span class="file-name">OrderAggregate.java — wire snapshot trigger</span><span class="file-lang">Java</span>
+        <button class="copy-code-btn" onclick="copyCode(this)">copy</button>
+      </div>
+      <pre class="code-block"><span class="cmt">// Reference the snapshot trigger bean by name in @Aggregate</span>
+<span class="ann">@Aggregate</span>(snapshotTriggerDefinition = <span class="str">"orderSnapshotTrigger"</span>)
+<span class="kw">public class</span> <span class="cls">OrderAggregate</span> {
+    <span class="cmt">// ... rest of the aggregate</span>
+}</pre>
+    </div>
+
+    <div class="flow-diagram" style="flex-direction:column;gap:.6rem;">
+      <div style="color:var(--muted2);font-size:.72rem;text-align:center;margin-bottom:.3rem;">WITHOUT snapshot: replay all N events</div>
+      <div style="display:flex;gap:.3rem;flex-wrap:wrap;justify-content:center;">
+        <div class="flow-box fb-purple" style="font-size:.65rem;padding:.3rem .6rem;">e1</div>
+        <div class="flow-box fb-purple" style="font-size:.65rem;padding:.3rem .6rem;">e2</div>
+        <div class="flow-box fb-purple" style="font-size:.65rem;padding:.3rem .6rem;">e3</div>
+        <span style="color:var(--muted);font-size:.75rem;align-self:center;">... 97 more ...</span>
+        <div class="flow-box fb-purple" style="font-size:.65rem;padding:.3rem .6rem;">e100</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box fb-sky" style="font-size:.65rem;padding:.3rem .6rem;">State</div>
+      </div>
+      <div style="color:var(--muted2);font-size:.72rem;text-align:center;margin-top:.5rem;">WITH snapshot: load snapshot + only recent events</div>
+      <div style="display:flex;gap:.3rem;flex-wrap:wrap;justify-content:center;">
+        <div class="flow-box fb-green" style="font-size:.65rem;padding:.3rem .6rem;">📸 snap@50</div>
+        <div class="flow-box fb-purple" style="font-size:.65rem;padding:.3rem .6rem;">e51</div>
+        <span style="color:var(--muted);font-size:.75rem;align-self:center;">...</span>
+        <div class="flow-box fb-purple" style="font-size:.65rem;padding:.3rem .6rem;">e100</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box fb-sky" style="font-size:.65rem;padding:.3rem .6rem;">State</div>
+      </div>
+    </div>
+
+    <div class="step-footer">
+      <button class="btn-primary" onclick="markDone(10)">Mark Complete ✓</button>
+      <button class="btn-secondary" onclick="navigate(1)">Next Step →</button>
+      <span class="step-of">Step 11 of 12</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- STEP 12 — REST CONTROLLER -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="step-page" id="step-11">
+    <div class="step-hero">
+      <div class="step-badge badge-lime"><span class="badge-num">12</span><span class="badge-label">REST API</span></div>
+      <div class="step-hero-text">
+        <h2>REST Controller — Wiring It All Together</h2>
+        <p>The final piece: expose HTTP endpoints that dispatch commands and queries through Axon gateways.</p>
+      </div>
+    </div>
+
+    <div class="code-section">
+      <div class="code-file-header">
+        <div class="file-dot fd-red"></div><div class="file-dot fd-yellow"></div><div class="file-dot fd-green"></div>
+        <span class="file-name">OrderController.java</span><span class="file-lang">Java</span>
+        <button class="copy-code-btn" onclick="copyCode(this)">copy</button>
+      </div>
+      <pre class="code-block"><span class="ann">@RestController</span>
+<span class="ann">@RequestMapping</span>(<span class="str">"/orders"</span>)
+<span class="kw">public class</span> <span class="cls">OrderController</span> {
+
+    <span class="kw">private final</span> <span class="cls">CommandGateway</span> commandGateway;  <span class="cmt">// ① Write side</span>
+    <span class="kw">private final</span> <span class="cls">QueryGateway</span>   queryGateway;    <span class="cmt">// ② Read side</span>
+
+    <span class="kw">public</span> <span class="fn">OrderController</span>(<span class="cls">CommandGateway</span> cg, <span class="cls">QueryGateway</span> qg) {
+        <span class="kw">this</span>.commandGateway = cg;
+        <span class="kw">this</span>.queryGateway   = qg;
+    }
+
+    <span class="cmt">// ── WRITE ENDPOINTS ────────────────────────────────</span>
+
+    <span class="ann">@PostMapping</span>
+    <span class="kw">public</span> <span class="cls">String</span> <span class="fn">createOrder</span>(<span class="ann">@RequestBody</span> <span class="cls">CreateOrderRequest</span> req) {
+        <span class="cls">String</span> id = <span class="cls">UUID</span>.<span class="fn">randomUUID</span>().<span class="fn">toString</span>();
+        commandGateway.<span class="fn">sendAndWait</span>(                  <span class="cmt">// ③ Dispatch command</span>
+            <span class="kw">new</span> <span class="cls">CreateOrderCommand</span>(id, req.customerId(), req.totalAmount())
+        );
+        <span class="kw">return</span> id;
+    }
+
+    <span class="ann">@PutMapping</span>(<span class="str">"/{id}/confirm"</span>)
+    <span class="kw">public void</span> <span class="fn">confirmOrder</span>(<span class="ann">@PathVariable</span> <span class="cls">String</span> id) {
+        commandGateway.<span class="fn">sendAndWait</span>(<span class="kw">new</span> <span class="cls">ConfirmOrderCommand</span>(id));
+    }
+
+    <span class="ann">@PutMapping</span>(<span class="str">"/{id}/ship"</span>)
+    <span class="kw">public void</span> <span class="fn">shipOrder</span>(<span class="ann">@PathVariable</span> <span class="cls">String</span> id,
+                           <span class="ann">@RequestParam</span> <span class="cls">String</span> address) {
+        commandGateway.<span class="fn">sendAndWait</span>(<span class="kw">new</span> <span class="cls">ShipOrderCommand</span>(id, address));
+    }
+
+    <span class="cmt">// ── READ ENDPOINTS ─────────────────────────────────</span>
+
+    <span class="ann">@GetMapping</span>(<span class="str">"/{id}"</span>)
+    <span class="kw">public</span> <span class="cls">OrderView</span> <span class="fn">getOrder</span>(<span class="ann">@PathVariable</span> <span class="cls">String</span> id) {
+        <span class="kw">return</span> queryGateway.<span class="fn">query</span>(                    <span class="cmt">// ④ Dispatch query</span>
+            <span class="kw">new</span> <span class="cls">FindOrderByIdQuery</span>(id),
+            <span class="cls">ResponseTypes</span>.<span class="fn">instanceOf</span>(<span class="cls">OrderView</span>.<span class="kw">class</span>)
+        ).<span class="fn">join</span>();
+    }
+
+    <span class="ann">@GetMapping</span>
+    <span class="kw">public</span> <span class="cls">List</span>&lt;<span class="cls">OrderView</span>&gt; <span class="fn">getAllOrders</span>() {
+        <span class="kw">return</span> queryGateway.<span class="fn">query</span>(
+            <span class="kw">new</span> <span class="cls">FindAllOrdersQuery</span>(),
+            <span class="cls">ResponseTypes</span>.<span class="fn">multipleInstancesOf</span>(<span class="cls">OrderView</span>.<span class="kw">class</span>)
+        ).<span class="fn">join</span>();
+    }
+}</pre>
+    </div>
+
+    <div style="margin-bottom:1.5rem;">
+      <div class="ann-line"><div class="ann-num">①</div><div class="ann-text"><strong>CommandGateway</strong> — the entry point to the write side. sendAndWait() dispatches synchronously and throws on failure.</div></div>
+      <div class="ann-line"><div class="ann-num">②</div><div class="ann-text"><strong>QueryGateway</strong> — the entry point to the read side. It routes the query to the matching @QueryHandler.</div></div>
+      <div class="ann-line"><div class="ann-num">③</div><div class="ann-text"><code>sendAndWait()</code> blocks until the command is fully processed. Use <code>send()</code> for fire-and-forget async behavior.</div></div>
+      <div class="ann-line"><div class="ann-num">④</div><div class="ann-text"><strong>ResponseTypes</strong> tells Axon what return type to expect from the @QueryHandler.</div></div>
+    </div>
+
+    <div class="explain-block">
+      <h3>🧪 Test It With curl</h3>
+      <pre style="background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:1rem;font-family:'IBM Plex Mono',monospace;font-size:.75rem;line-height:1.8;overflow-x:auto;"><span class="cmt"># 1. Create an order</span>
+<span class="fn">curl</span> -X POST http://localhost:8080/orders \
+  -H "Content-Type: application/json" \
+  -d '{"customerId":"cust-1","totalAmount":99.99}'
+
+<span class="cmt"># 2. Confirm it (use the returned UUID)</span>
+<span class="fn">curl</span> -X PUT http://localhost:8080/orders/{id}/confirm
+
+<span class="cmt"># 3. Ship it</span>
+<span class="fn">curl</span> -X PUT "http://localhost:8080/orders/{id}/ship?address=123+Main+St"
+
+<span class="cmt"># 4. Query the read model</span>
+<span class="fn">curl</span> http://localhost:8080/orders/{id}</pre>
+    </div>
+
+    <div class="callout callout-tip">
+      <div class="callout-icon">🎉</div>
+      <p><strong>Congratulations!</strong> You now have a complete CQRS + Event Sourcing + Axon application. Commands go in → events are stored → projections update → queries read the projection. The write side never touches the read side directly.</p>
+    </div>
+
+    <div class="step-footer">
+      <button class="btn-primary" onclick="markDone(11)" id="finalDoneBtn">Mark Complete ✓</button>
+      <span class="step-of" style="margin-left:auto;">Step 12 of 12</span>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<script>
+let currentStep = 0;
+const totalSteps = 12;
+const done = new Set();
+
+const titles = [
+  'Step 1 — Project Setup',
+  'Step 2 — Domain Model',
+  'Step 3 — Commands',
+  'Step 4 — Events',
+  'Step 5 — Aggregate',
+  'Step 6 — Command Handler Flow',
+  'Step 7 — @EventSourcingHandler',
+  'Step 8 — Projection',
+  'Step 9 — Query Handlers',
+  'Step 10 — Saga',
+  'Step 11 — Snapshots',
+  'Step 12 — REST Controller',
+];
+
+function goTo(n, e) {
+  if (e) e.preventDefault();
+  document.querySelectorAll('.step-page').forEach(p => p.classList.remove('active'));
+  document.getElementById(`step-${n}`).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach((item, i) => {
+    item.classList.toggle('active', i === n);
+  });
+  currentStep = n;
+  document.getElementById('breadcrumb').textContent = titles[n];
+  document.getElementById('prevBtn').disabled = n === 0;
+  document.getElementById('nextBtn').disabled = n === totalSteps - 1;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function navigate(dir) {
+  const next = currentStep + dir;
+  if (next >= 0 && next < totalSteps) goTo(next);
+}
+
+function markDone(n) {
+  done.add(n);
+  const navItems = document.querySelectorAll('.nav-item');
+  navItems[n].classList.add('done');
+  navItems[n].classList.remove('active');
+
+  const pct = Math.round(done.size / totalSteps * 100);
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('progText').textContent = `${done.size} / ${totalSteps} complete`;
+
+  if (done.size === totalSteps) {
+    setTimeout(() => alert('🎉 Guide complete! You now know CQRS + Event Sourcing + Axon.'), 200);
+  } else {
+    navigate(1);
+  }
+}
+
+function copyCode(btn) {
+  const pre = btn.closest('.code-file-header').nextElementSibling;
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    setTimeout(() => btn.textContent = 'copy', 1500);
+  });
+}
+
+// wire nav-item clicks properly
+document.querySelectorAll('.nav-item').forEach((item, i) => {
+  item.addEventListener('click', (e) => { e.preventDefault(); goTo(i); });
+});
+</script>
+</body>
+</html>

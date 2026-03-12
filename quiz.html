@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CQRS · Event Sourcing · Axon — Master Quiz</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --code-bg: #0d1117;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  .grid-bg {
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+  .glow { position: fixed; top: -200px; left: -200px; width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(0,212,255,.07) 0%, transparent 70%);
+    pointer-events: none; z-index: 0; }
+  .glow2 { position: fixed; bottom: -200px; right: -200px; width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(124,58,237,.07) 0%, transparent 70%);
+    pointer-events: none; z-index: 0; }
+
+  /* HEADER */
+  header {
+    position: relative; z-index: 10;
+    padding: 2rem 2rem 0;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10,14,26,.9);
+    backdrop-filter: blur(10px);
+  }
+  .logo-line { display: flex; align-items: center; justify-content: center; gap: .6rem; margin-bottom: .4rem; }
+  .logo-dot { width: 10px; height: 10px; border-radius: 50%; animation: pulse 2s infinite; }
+  .dot1 { background: var(--accent); }
+  .dot2 { background: var(--accent2); animation-delay: .4s; }
+  .dot3 { background: var(--accent3); animation-delay: .8s; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.7)} }
+  h1 { font-size: clamp(1.6rem, 4vw, 2.8rem); font-weight: 800; letter-spacing: -.02em;
+    background: linear-gradient(135deg, var(--accent), var(--accent2), var(--accent3));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .subtitle { font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: var(--muted);
+    letter-spacing: .15em; text-transform: uppercase; padding: .5rem 0 1.2rem; }
+
+  /* TABS */
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  .tab-btn {
+    flex: 1; min-width: 120px; padding: .8rem 1rem;
+    background: none; border: none; color: var(--muted);
+    font-family: 'JetBrains Mono', monospace; font-size: .75rem;
+    letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all .2s; white-space: nowrap;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* MAIN */
+  .container { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  /* STATS BAR */
+  .stats-bar {
+    display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem;
+    padding: 1rem 1.2rem; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .stat { display: flex; flex-direction: column; gap: .2rem; }
+  .stat-label { font-family: 'JetBrains Mono', monospace; font-size: .65rem; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+  .stat-val { font-size: 1.3rem; font-weight: 800; }
+  .stat-val.cyan { color: var(--accent); }
+  .stat-val.purple { color: var(--accent2); }
+  .stat-val.green { color: var(--accent3); }
+  .stat-val.amber { color: var(--warn); }
+  .progress-wrap { flex: 1; min-width: 200px; display: flex; flex-direction: column; justify-content: center; gap: .4rem; }
+  .progress-bar-outer { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .progress-bar-inner { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .4s ease; }
+
+  /* SECTION HEADER */
+  .section-header {
+    display: flex; align-items: center; gap: .8rem; margin-bottom: 1.5rem;
+    padding-bottom: .8rem; border-bottom: 1px solid var(--border);
+  }
+  .section-icon { font-size: 1.4rem; }
+  .section-title { font-size: 1.2rem; font-weight: 700; }
+  .section-count { margin-left: auto; font-family: 'JetBrains Mono', monospace;
+    font-size: .72rem; color: var(--muted); background: var(--surface2);
+    padding: .25rem .6rem; border-radius: 4px; border: 1px solid var(--border); }
+
+  /* QUESTION CARD */
+  .q-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 1.4rem 1.6rem; margin-bottom: 1.2rem;
+    transition: border-color .2s, transform .15s;
+  }
+  .q-card:hover { border-color: rgba(0,212,255,.2); transform: translateY(-1px); }
+  .q-header { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
+  .q-num {
+    flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: .75rem; font-weight: 700;
+    background: var(--surface2); color: var(--accent); border: 1px solid var(--border);
+  }
+  .q-text { font-size: .97rem; line-height: 1.6; font-weight: 600; flex: 1; }
+  .q-tag {
+    flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-size: .6rem;
+    padding: .2rem .5rem; border-radius: 4px; text-transform: uppercase; letter-spacing: .05em;
+  }
+  .tag-tf { background: rgba(0,212,255,.1); color: var(--accent); border: 1px solid rgba(0,212,255,.2); }
+  .tag-qcm { background: rgba(124,58,237,.1); color: #a78bfa; border: 1px solid rgba(124,58,237,.2); }
+  .tag-code { background: rgba(16,185,129,.1); color: var(--accent3); border: 1px solid rgba(16,185,129,.2); }
+
+  /* OPTIONS */
+  .options { display: flex; flex-direction: column; gap: .5rem; }
+  .opt-btn {
+    display: flex; align-items: flex-start; gap: .7rem;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: .7rem 1rem; cursor: pointer;
+    font-family: 'Syne', sans-serif; font-size: .88rem; color: var(--text);
+    text-align: left; transition: all .15s; line-height: 1.5;
+  }
+  .opt-btn:hover:not(:disabled) { border-color: rgba(0,212,255,.4); background: rgba(0,212,255,.05); }
+  .opt-label { flex-shrink: 0; width: 22px; height: 22px; border-radius: 5px;
+    background: var(--border); display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: .7rem; font-weight: 700; margin-top: 1px; }
+  .opt-btn.correct { border-color: var(--accent3); background: rgba(16,185,129,.08); }
+  .opt-btn.correct .opt-label { background: var(--accent3); color: #fff; }
+  .opt-btn.wrong { border-color: var(--danger); background: rgba(239,68,68,.08); }
+  .opt-btn.wrong .opt-label { background: var(--danger); color: #fff; }
+  .opt-btn.revealed-correct { border-color: var(--accent3); background: rgba(16,185,129,.05); opacity: .7; }
+  .opt-btn.revealed-correct .opt-label { background: rgba(16,185,129,.3); color: var(--accent3); }
+
+  /* TF BUTTONS */
+  .tf-row { display: flex; gap: .7rem; }
+  .tf-btn {
+    flex: 1; padding: .65rem 1rem; border-radius: 8px; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: .85rem; font-weight: 700;
+    letter-spacing: .05em; border: 2px solid var(--border);
+    background: var(--surface2); color: var(--text); transition: all .15s;
+  }
+  .tf-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .tf-btn.correct { border-color: var(--accent3); background: rgba(16,185,129,.12); color: var(--accent3); }
+  .tf-btn.wrong { border-color: var(--danger); background: rgba(239,68,68,.12); color: var(--danger); }
+  .tf-btn.revealed { border-color: var(--accent3); background: rgba(16,185,129,.06); color: var(--accent3); opacity: .6; }
+
+  /* EXPLANATION */
+  .explanation {
+    margin-top: .9rem; padding: .8rem 1rem; border-radius: 8px;
+    background: rgba(0,212,255,.04); border-left: 3px solid var(--accent);
+    font-size: .85rem; line-height: 1.65; color: #94a3b8; display: none;
+  }
+  .explanation.show { display: block; }
+  .explanation strong { color: var(--accent); }
+
+  /* CODE BLOCK */
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.1rem 1.2rem; overflow-x: auto;
+    margin: .8rem 0; font-family: 'JetBrains Mono', monospace; font-size: .78rem;
+    line-height: 1.7; color: #e2e8f0; position: relative;
+  }
+  .kw { color: #ff7b72; }
+  .cls { color: #ffa657; }
+  .fn { color: #d2a8ff; }
+  .str { color: #a5d6ff; }
+  .cmt { color: #8b949e; font-style: italic; }
+  .ann { color: #7ee787; }
+  .num { color: #79c0ff; }
+  .copy-btn {
+    position: absolute; top: .5rem; right: .5rem;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: .65rem;
+    padding: .2rem .5rem; border-radius: 4px; cursor: pointer; transition: all .15s;
+  }
+  .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* RESET BTN */
+  .reset-btn {
+    display: flex; align-items: center; gap: .5rem;
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    font-family: 'JetBrains Mono', monospace; font-size: .75rem; padding: .5rem 1rem;
+    border-radius: 8px; cursor: pointer; transition: all .2s; margin-bottom: 1.5rem;
+  }
+  .reset-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* HIDDEN */
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* SCORE OVERLAY */
+  .score-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(10,14,26,.95); backdrop-filter: blur(12px);
+    display: flex; align-items: center; justify-content: center;
+    display: none;
+  }
+  .score-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+    padding: 3rem; text-align: center; max-width: 400px; width: 90%;
+  }
+  .score-big { font-size: 4rem; font-weight: 800; background: linear-gradient(135deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+  .score-label { font-family: 'JetBrains Mono', monospace; color: var(--muted); font-size: .8rem; letter-spacing: .1em; margin-bottom: 1.5rem; }
+  .close-score {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none; color: #fff; font-family: 'Syne', sans-serif; font-weight: 700;
+    font-size: 1rem; padding: .8rem 2rem; border-radius: 10px; cursor: pointer;
+  }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media(max-width:600px) {
+    .stats-bar { flex-wrap: wrap; }
+    .q-card { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+    <div style="display:flex; align-items:center; justify-content:center; padding: 40px 20px;">
+        <a style="width: 400px; color:red; font-size: large; padding: 20px; margin: 20px;" href="./quiz1.html">Work flow of command to event in axon</a>
+    </div>
+<div class="grid-bg"></div>
+<div class="glow"></div>
+<div class="glow2"></div>
+
+<div class="score-overlay" id="scoreOverlay">
+  <div class="score-box">
+    <div class="score-big" id="finalScore">0%</div>
+    <div class="score-label">QUIZ COMPLETE — FINAL SCORE</div>
+    <p style="color:#94a3b8;font-size:.9rem;margin-bottom:1.5rem" id="finalDetail"></p>
+    <button class="close-score" onclick="closeScore()">Continue Reviewing</button>
+  </div>
+</div>
+
+<header>
+  <div class="logo-line">
+    <div class="logo-dot dot1"></div>
+    <div class="logo-dot dot2"></div>
+    <div class="logo-dot dot3"></div>
+  </div>
+  <h1>CQRS · Event Sourcing · Axon</h1>
+  <div class="subtitle">Master Quiz — 80 Questions + Key Code Snippets</div>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('all')">All Questions</button>
+    <button class="tab-btn" onclick="switchTab('tf')">True / False</button>
+    <button class="tab-btn" onclick="switchTab('qcm')">QCM</button>
+    <button class="tab-btn" onclick="switchTab('code')">Code Concepts</button>
+  </div>
+</header>
+
+<div class="container">
+  <div class="stats-bar">
+    <div class="stat"><div class="stat-label">Total</div><div class="stat-val cyan" id="statTotal">80</div></div>
+    <div class="stat"><div class="stat-label">Answered</div><div class="stat-val purple" id="statAnswered">0</div></div>
+    <div class="stat"><div class="stat-label">Correct</div><div class="stat-val green" id="statCorrect">0</div></div>
+    <div class="stat"><div class="stat-label">Wrong</div><div class="stat-val" style="color:var(--danger)" id="statWrong">0</div></div>
+    <div class="stat"><div class="stat-label">Score</div><div class="stat-val amber" id="statScore">—</div></div>
+    <div class="progress-wrap">
+      <div class="stat-label" style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;">Progress</div>
+      <div class="progress-bar-outer"><div class="progress-bar-inner" id="progressBar" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <button class="reset-btn" onclick="resetAll()">↺ Reset All Answers</button>
+
+  <div id="questionsContainer"></div>
+</div>
+
+<script>
+const questions = [
+  // ─── TRUE / FALSE ───────────────────────────────────────────────────────────
+  {id:1,type:'tf',topic:'CQRS',
+   text:'CQRS stands for Command Query Responsibility Segregation, meaning commands and queries are handled by separate models.',
+   answer:true,
+   explain:'CQRS separates the write model (commands) from the read model (queries), allowing each to be optimized independently.'},
+  {id:2,type:'tf',topic:'CQRS',
+   text:'In CQRS, a Command always returns data to the caller.',
+   answer:false,
+   explain:'Commands express intent to change state and typically return void or an acknowledgement. Queries return data.'},
+  {id:3,type:'tf',topic:'CQRS',
+   text:'CQRS requires Event Sourcing to function correctly.',
+   answer:false,
+   explain:'CQRS and Event Sourcing are complementary but independent patterns. CQRS can be used with a traditional relational store.'},
+  {id:4,type:'tf',topic:'Event Sourcing',
+   text:'Event Sourcing stores the current state of an entity by persisting all domain events that occurred.',
+   answer:true,
+   explain:'The event store acts as the source of truth. State is reconstructed by replaying events from the beginning.'},
+  {id:5,type:'tf',topic:'Event Sourcing',
+   text:'Events in Event Sourcing can be mutated after they are persisted.',
+   answer:false,
+   explain:'Events are immutable. Once persisted, they represent facts that happened and must never be altered.'},
+  {id:6,type:'tf',topic:'Event Sourcing',
+   text:'Snapshots in Event Sourcing improve read performance by storing a pre-built aggregate state at a given point.',
+   answer:true,
+   explain:'Instead of replaying all events from the start, the system can load the latest snapshot and only replay subsequent events.'},
+  {id:7,type:'tf',topic:'Axon',
+   text:'Axon Framework is a Java/JVM framework that provides implementations of CQRS and Event Sourcing patterns.',
+   answer:true,
+   explain:'Axon Framework (by AxonIQ) is the leading Java framework for CQRS, Event Sourcing, and DDD.'},
+  {id:8,type:'tf',topic:'Axon',
+   text:'The @CommandHandler annotation in Axon marks a method that handles query operations.',
+   answer:false,
+   explain:'@CommandHandler marks methods that handle commands. @QueryHandler is used for query handling.'},
+  {id:9,type:'tf',topic:'Axon',
+   text:'Axon Server is required to use Axon Framework.',
+   answer:false,
+   explain:'Axon Server is optional. You can use alternative message routing (e.g., in-memory or Spring AMQP) for development or simpler setups.'},
+  {id:10,type:'tf',topic:'Axon',
+   text:'In Axon, @Aggregate annotated classes are managed by the Repository and are the root of a DDD aggregate.',
+   answer:true,
+   explain:'The @Aggregate annotation marks the class as an Axon-managed aggregate root, persisted via command/event handling.'},
+  {id:11,type:'tf',topic:'Event Sourcing',
+   text:'Projections in Event Sourcing are read-side models built from events.',
+   answer:true,
+   explain:'Projections (also called "view models" or "read models") consume events and build query-optimized data structures.'},
+  {id:12,type:'tf',topic:'CQRS',
+   text:'In a CQRS architecture, the read model and write model must share the same database.',
+   answer:false,
+   explain:'One of CQRS\'s key benefits is polyglot persistence — the write side can use a relational DB while the read side uses Elasticsearch, Redis, etc.'},
+  {id:13,type:'tf',topic:'Axon',
+   text:'@EventSourcingHandler in Axon is used to apply state changes to the aggregate based on events.',
+   answer:true,
+   explain:'@EventSourcingHandler methods mutate aggregate state in response to applied events. They are the only place state should change.'},
+  {id:14,type:'tf',topic:'Axon',
+   text:'Sagas in Axon can only be used with Event Sourcing-backed aggregates.',
+   answer:false,
+   explain:'Sagas are independent of aggregate storage strategy. They manage long-running processes by reacting to events.'},
+  {id:15,type:'tf',topic:'Event Sourcing',
+   text:'An event store is typically append-only.',
+   answer:true,
+   explain:'Append-only is a fundamental property. Events are never deleted or updated — only new events are written.'},
+  {id:16,type:'tf',topic:'CQRS',
+   text:'Eventual consistency is a common characteristic of CQRS read models.',
+   answer:true,
+   explain:'Because projections are updated asynchronously, the read model may lag slightly behind the write model — this is eventual consistency.'},
+  {id:17,type:'tf',topic:'Axon',
+   text:'The CommandGateway in Axon is used to dispatch events.',
+   answer:false,
+   explain:'CommandGateway dispatches commands. EventGateway (or AggregateLifecycle.apply()) is used to publish events.'},
+  {id:18,type:'tf',topic:'Axon',
+   text:'Axon supports multi-tenancy scenarios.',
+   answer:true,
+   explain:'Axon Framework 4.6+ added built-in multi-tenancy support allowing tenant-isolated command/event/query processing.'},
+  {id:19,type:'tf',topic:'Event Sourcing',
+   text:'Upcasting in Event Sourcing is used to convert old event schemas to newer versions.',
+   answer:true,
+   explain:'Upcasters transform old event representations to the current schema without modifying stored events.'},
+  {id:20,type:'tf',topic:'CQRS',
+   text:'Command handlers should contain business logic and validate business rules.',
+   answer:true,
+   explain:'The command handler (or aggregate command handler) is responsible for validation and enforcing invariants before emitting events.'},
+
+  // ─── QCM ────────────────────────────────────────────────────────────────────
+  {id:21,type:'qcm',topic:'CQRS',
+   text:'Which of the following best describes the role of a Command in CQRS?',
+   options:['Returns a data projection','Expresses intent to change system state','Reads data from the event store','Replays events to rebuild projections'],
+   answer:1,
+   explain:'A Command is an imperative request that <strong>expresses intent to change state</strong>. It does not return data (only success/failure).'},
+  {id:22,type:'qcm',topic:'CQRS',
+   text:'What does "Query Responsibility" mean in CQRS?',
+   options:['Queries write to the database','Queries handle command validation','Queries only read data and have no side effects','Queries dispatch events'],
+   answer:2,
+   explain:'Queries are purely read operations. They must not alter system state — no side effects.'},
+  {id:23,type:'qcm',topic:'Event Sourcing',
+   text:'How is the current state of an aggregate reconstructed in Event Sourcing?',
+   options:['By reading the latest snapshot only','By replaying all persisted events in order','By querying the read model database','By calling a REST endpoint'],
+   answer:1,
+   explain:'The aggregate is reconstituted by <strong>replaying events</strong> from the event store, applying each @EventSourcingHandler in sequence.'},
+  {id:24,type:'qcm',topic:'Event Sourcing',
+   text:'What is the primary advantage of snapshots in Event Sourcing?',
+   options:['They replace events entirely','They allow event mutation','They reduce aggregate load time by avoiding full event replay','They disable event versioning'],
+   answer:2,
+   explain:'Snapshots cache the aggregate state at a specific version, so only events <em>after</em> the snapshot need replaying.'},
+  {id:25,type:'qcm',topic:'Axon',
+   text:'In Axon, which annotation is placed on the aggregate identifier field?',
+   options:['@CommandHandler','@AggregateIdentifier','@EntityId','@EventSourcingHandler'],
+   answer:1,
+   explain:'<strong>@AggregateIdentifier</strong> marks the field Axon uses to route commands and events to the correct aggregate instance.'},
+  {id:26,type:'qcm',topic:'Axon',
+   text:'Which Axon component is responsible for routing commands to the correct handler?',
+   options:['EventBus','QueryBus','CommandBus','SagaStore'],
+   answer:2,
+   explain:'The <strong>CommandBus</strong> dispatches commands to their registered @CommandHandler methods.'},
+  {id:27,type:'qcm',topic:'Axon',
+   text:'What does AggregateLifecycle.apply() do in Axon?',
+   options:['Sends a command','Publishes an event and triggers @EventSourcingHandler','Queries the read model','Persists directly to the database'],
+   answer:1,
+   explain:'<code>AggregateLifecycle.apply(event)</code> publishes the event on the aggregate, triggering the matching @EventSourcingHandler to mutate state.'},
+  {id:28,type:'qcm',topic:'Axon',
+   text:'What is the purpose of a Saga in Axon?',
+   options:['To store aggregate snapshots','To manage long-running business processes across multiple aggregates','To serve as a read model','To replace the command bus'],
+   answer:1,
+   explain:'<strong>Sagas</strong> are stateful event listeners that orchestrate long-running processes, potentially spanning multiple aggregates and services.'},
+  {id:29,type:'qcm',topic:'CQRS',
+   text:'In CQRS, eventual consistency refers to:',
+   options:['The command side always being consistent','The read model may temporarily lag behind the write model','Commands never failing','Events always being synchronous'],
+   answer:1,
+   explain:'Because projections are updated asynchronously, the read model is <strong>eventually consistent</strong> — it converges to the correct state over time.'},
+  {id:30,type:'qcm',topic:'Event Sourcing',
+   text:'Which of the following is a valid use case for event upcasting?',
+   options:['Deleting old events','Converting an old event schema to a newer version','Encrypting events','Dispatching commands'],
+   answer:1,
+   explain:'<strong>Upcasters</strong> migrate old event representations to current versions when the event schema evolves, without altering stored data.'},
+  {id:31,type:'qcm',topic:'Axon',
+   text:'Which Axon annotation is used to handle an event in a projection (read model)?',
+   options:['@CommandHandler','@SagaEventHandler','@EventHandler','@QueryHandler'],
+   answer:2,
+   explain:'<strong>@EventHandler</strong> (in a @Component or @ProcessingGroup) processes events to update read models.'},
+  {id:32,type:'qcm',topic:'Axon',
+   text:'What is Axon Server primarily used for?',
+   options:['ORM database access','Centralized message routing and event storage','REST API gateway','Schema migration'],
+   answer:1,
+   explain:'<strong>Axon Server</strong> is a purpose-built message router and event store that connects distributed Axon applications.'},
+  {id:33,type:'qcm',topic:'CQRS',
+   text:'Which pattern is CQRS most closely related to?',
+   options:['Repository Pattern','CQS (Command Query Separation) by Bertrand Meyer','Factory Pattern','Observer Pattern'],
+   answer:1,
+   explain:'CQRS extends <strong>CQS</strong> (Command Query Separation) from the method level to the architectural/object level.'},
+  {id:34,type:'qcm',topic:'Event Sourcing',
+   text:'What does the term "projection" mean in Event Sourcing?',
+   options:['A command validated by the aggregate','A read model built by consuming events','A snapshot of the event store','A saga state machine'],
+   answer:1,
+   explain:'A <strong>projection</strong> listens to domain events and builds a query-optimized view of the data.'},
+  {id:35,type:'qcm',topic:'Axon',
+   text:'How do you configure an Axon aggregate to use Event Sourcing?',
+   options:['Annotate with @Entity','Set snapshotting = true','Extend AbstractAnnotatedAggregateRoot or use @Aggregate with @EventSourcingHandler','Use @Repository directly'],
+   answer:2,
+   explain:'Adding <strong>@EventSourcingHandler</strong> methods in a <strong>@Aggregate</strong> class tells Axon to persist and replay events for state reconstruction.'},
+  {id:36,type:'qcm',topic:'CQRS',
+   text:'Which of these is NOT a benefit of CQRS?',
+   options:['Independent scaling of reads and writes','Simplified domain model','Optimized read and write models','Support for polyglot persistence'],
+   answer:1,
+   explain:'CQRS typically <strong>increases complexity</strong> — it splits the model in two. It does NOT simplify the domain model.'},
+  {id:37,type:'qcm',topic:'Event Sourcing',
+   text:'What is the "event store" in Event Sourcing?',
+   options:['A cache layer for queries','The append-only database where domain events are persisted','A command queue','A saga repository'],
+   answer:1,
+   explain:'The <strong>event store</strong> is the authoritative, append-only log of all domain events. It is the sole source of truth.'},
+  {id:38,type:'qcm',topic:'Axon',
+   text:'In Axon, what is the role of @StartSaga?',
+   options:['Terminates a saga','Creates a new saga instance when a specific event is received','Defines command routing','Schedules a deadline'],
+   answer:1,
+   explain:'<strong>@StartSaga</strong> (combined with @SagaEventHandler) creates a new saga instance when the annotated event fires.'},
+  {id:39,type:'qcm',topic:'Axon',
+   text:'Which Axon interface is used for point-to-point query dispatching?',
+   options:['EventBus','CommandGateway','QueryGateway','SagaBus'],
+   answer:2,
+   explain:'The <strong>QueryGateway</strong> dispatches queries to registered @QueryHandler methods and returns results.'},
+  {id:40,type:'qcm',topic:'CQRS',
+   text:'In a distributed CQRS system, what mechanism typically propagates changes from the write to the read side?',
+   options:['Direct database joins','Domain events published on a message bus','REST polling','Shared JPA repository'],
+   answer:1,
+   explain:'<strong>Domain events</strong> published to a message bus (Kafka, RabbitMQ, Axon Server) trigger projections on the read side.'},
+  {id:41,type:'qcm',topic:'Axon',
+   text:'What does @EndSaga do in an Axon Saga?',
+   options:['Starts a new saga','Marks the saga as completed and eligible for cleanup','Dispatches a command','Replays events'],
+   answer:1,
+   explain:'<strong>@EndSaga</strong> marks the saga instance as finished. Axon removes it from the saga store.'},
+  {id:42,type:'qcm',topic:'Event Sourcing',
+   text:'Which problem does "event versioning" solve?',
+   options:['Improving write throughput','Handling schema changes in events over time','Encrypting events at rest','Load balancing projections'],
+   answer:1,
+   explain:'<strong>Event versioning</strong> (via upcasters or revision annotations) lets systems evolve event schemas without breaking historical event replay.'},
+  {id:43,type:'qcm',topic:'Axon',
+   text:'What is the default storage mechanism in Axon when Axon Server is not used?',
+   options:['MongoDB','JPA EventStorageEngine (EmbeddedEventStore)','Redis','Cassandra'],
+   answer:1,
+   explain:'Without Axon Server, Axon defaults to a <strong>JPA-based EmbeddedEventStore</strong> for persisting events locally.'},
+  {id:44,type:'qcm',topic:'CQRS',
+   text:'Which principle does Command Handler validation align with?',
+   options:['Open/Closed Principle','Single Responsibility Principle','Tell Don\'t Ask','Domain Invariant Enforcement'],
+   answer:3,
+   explain:'Command handlers enforce <strong>domain invariants</strong>: if the command violates business rules, it throws an exception before any event is emitted.'},
+  {id:45,type:'qcm',topic:'Event Sourcing',
+   text:'What is "event replay" typically used for?',
+   options:['Deleting projections','Rebuilding read models or migrating to new projections','Invalidating the command bus','Restarting aggregates randomly'],
+   answer:1,
+   explain:'<strong>Event replay</strong> re-processes the event log to build a new projection or fix a corrupted read model.'},
+  {id:46,type:'qcm',topic:'Axon',
+   text:'How does Axon support Deadlines (scheduling)?',
+   options:['Via @Scheduled from Spring','Via the DeadlineManager API','Via Quartz only','Via CommandGateway.sendWithTimeout()'],
+   answer:1,
+   explain:'Axon\'s <strong>DeadlineManager</strong> schedules time-based events within Sagas and Aggregates, handling timeouts and expiry scenarios.'},
+  {id:47,type:'qcm',topic:'CQRS',
+   text:'The "thin read layer" in CQRS typically means:',
+   options:['The read layer has heavy business logic','The read layer directly executes SQL queries against the write database','The read layer is a simple data fetching layer without domain logic','The read layer uses only Redis'],
+   answer:2,
+   explain:'The read side is intentionally kept simple — just data fetching. Business logic stays in the write model.'},
+  {id:48,type:'qcm',topic:'Axon',
+   text:'Which annotation registers a class as a processing group in Axon?',
+   options:['@EventHandler','@ProcessingGroup','@SagaEventHandler','@Component'],
+   answer:1,
+   explain:'<strong>@ProcessingGroup</strong> groups event handlers into a named processor, controlling threading, error handling, and tracking.'},
+  {id:49,type:'qcm',topic:'Event Sourcing',
+   text:'What is a "tombstone event"?',
+   options:['The first event in an aggregate lifecycle','An event marking the deletion/end-of-life of an aggregate','A snapshot trigger','A compensating transaction event'],
+   answer:1,
+   explain:'A <strong>tombstone event</strong> signals the aggregate\'s end of life. Since events can\'t be deleted, this is how "deletion" is modeled.'},
+  {id:50,type:'qcm',topic:'Axon',
+   text:'Which Axon concept provides "at-least-once" event processing guarantees?',
+   options:['SimpleEventBus','TrackingEventProcessor','SubscribingEventProcessor','QueryBus'],
+   answer:1,
+   explain:'<strong>TrackingEventProcessor</strong> maintains a token store to track progress, ensuring events are not missed and providing at-least-once delivery.'},
+  {id:51,type:'qcm',topic:'CQRS',
+   text:'Which of the following is an example of a Command?',
+   options:['GetOrderByIdQuery','OrderCreatedEvent','PlaceOrderCommand','OrderProjection'],
+   answer:2,
+   explain:'<strong>PlaceOrderCommand</strong> is a command — it expresses the intent to place an order (imperative, side-effect-producing).'},
+  {id:52,type:'qcm',topic:'Event Sourcing',
+   text:'GDPR "right to be forgotten" is challenging with Event Sourcing because:',
+   options:['Events are encrypted by default','Events are immutable and append-only, making deletion difficult','Axon does not support GDPR','The read model auto-deletes'],
+   answer:1,
+   explain:'Immutability conflicts with deletion requirements. Solutions include crypto-shredding (encrypt PII and discard the key) or dedicated event erasure strategies.'},
+  {id:53,type:'qcm',topic:'Axon',
+   text:'What does the @TargetAggregateIdentifier annotation do in Axon commands?',
+   options:['Marks the command as validated','Tells the CommandBus which aggregate instance to route the command to','Encrypts the command payload','Starts a saga'],
+   answer:1,
+   explain:'<strong>@TargetAggregateIdentifier</strong> on a command field tells the CommandBus the aggregate ID to route to.'},
+  {id:54,type:'qcm',topic:'CQRS',
+   text:'Which architectural style pairs most naturally with CQRS and Event Sourcing?',
+   options:['Monolithic MVC','Microservices','Client-Server 2-tier','Batch processing'],
+   answer:1,
+   explain:'<strong>Microservices</strong> align well with CQRS+ES — bounded contexts, independent scaling, and event-driven communication are complementary.'},
+  {id:55,type:'qcm',topic:'Axon',
+   text:'What is the purpose of the @Revision annotation in Axon?',
+   options:['Marks aggregate version','Specifies event schema version for upcasting','Defines snapshot interval','Sets command priority'],
+   answer:1,
+   explain:'<strong>@Revision</strong> tags an event class with a version string, enabling the upcaster chain to identify and transform old event versions.'},
+  {id:56,type:'qcm',topic:'Event Sourcing',
+   text:'A compensating transaction in Event Sourcing is:',
+   options:['A transaction that deletes events','An event that semantically reverses a previous action','A snapshot that rewinds state','A command that aborts the saga'],
+   answer:1,
+   explain:'Since events are immutable, to "undo" an action you emit a new <strong>compensating event</strong> that semantically reverses the previous one.'},
+  {id:57,type:'qcm',topic:'Axon',
+   text:'How does Axon handle concurrency conflicts in aggregates?',
+   options:['Last-write-wins','Optimistic locking via sequence numbers','Pessimistic locking via DB transactions','No conflict handling'],
+   answer:1,
+   explain:'Axon uses <strong>optimistic locking</strong>: each aggregate has a sequence number. Conflicting writes throw a ConcurrencyException.'},
+  {id:58,type:'qcm',topic:'CQRS',
+   text:'What is the "write model" responsible for in CQRS?',
+   options:['Serving fast reads','Enforcing business rules and persisting state changes','Caching query results','Providing full-text search'],
+   answer:1,
+   explain:'The <strong>write model</strong> handles commands, enforces domain invariants, and records state changes (as events or state).'},
+  {id:59,type:'qcm',topic:'Event Sourcing',
+   text:'Which of the following best describes an Aggregate in DDD/Event Sourcing?',
+   options:['A database table','A cluster of domain objects treated as a single unit of consistency','A read model','A message queue topic'],
+   answer:1,
+   explain:'An <strong>Aggregate</strong> is a consistency boundary — a cluster of entities and value objects with a root that enforces invariants.'},
+  {id:60,type:'qcm',topic:'Axon',
+   text:'What does the ReplayStatus in Axon indicate to @EventHandler methods?',
+   options:['Whether the event is encrypted','Whether the event is being replayed from the event store or arriving live','The event priority','The event schema version'],
+   answer:1,
+   explain:'Handlers can inject <strong>@ReplayStatus</strong> to detect if processing is a replay (useful to skip side effects like sending emails during rebuild).'},
+
+  // ─── CODE CONCEPT QUESTIONS ─────────────────────────────────────────────────
+  {id:61,type:'code',topic:'Axon',
+   text:'What is the output behavior of this Axon aggregate command handler?',
+   code:`<span class="ann">@Aggregate</span>
+<span class="kw">public class</span> <span class="cls">OrderAggregate</span> {
+
+    <span class="ann">@AggregateIdentifier</span>
+    <span class="kw">private</span> String orderId;
+    <span class="kw">private</span> <span class="cls">OrderStatus</span> status;
+
+    <span class="ann">@CommandHandler</span>
+    <span class="kw">public</span> <span class="fn">OrderAggregate</span>(<span class="cls">CreateOrderCommand</span> cmd) {
+        <span class="cls">AggregateLifecycle</span>.<span class="fn">apply</span>(<span class="kw">new</span> <span class="cls">OrderCreatedEvent</span>(cmd.<span class="fn">getOrderId</span>()));
+    }
+
+    <span class="ann">@EventSourcingHandler</span>
+    <span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">OrderCreatedEvent</span> event) {
+        <span class="kw">this</span>.orderId = event.<span class="fn">getOrderId</span>();
+        <span class="kw">this</span>.status = <span class="cls">OrderStatus</span>.CREATED;
+    }
+}`,
+   options:['Directly saves to the database','Publishes OrderCreatedEvent and sets orderId/status via @EventSourcingHandler','Returns the order ID to the caller','Throws an exception because no @TargetAggregateIdentifier is set'],
+   answer:1,
+   explain:'<code>AggregateLifecycle.apply()</code> publishes the event. The matching <strong>@EventSourcingHandler</strong> then mutates state. The event is stored by Axon.'},
+  {id:62,type:'code',topic:'Axon',
+   text:'What is wrong with this command class?',
+   code:`<span class="kw">public class</span> <span class="cls">ShipOrderCommand</span> {
+    <span class="kw">private final</span> String orderId;
+    <span class="kw">private final</span> String address;
+
+    <span class="kw">public</span> <span class="fn">ShipOrderCommand</span>(String orderId, String address) {
+        <span class="kw">this</span>.orderId = orderId;
+        <span class="kw">this</span>.address = address;
+    }
+    <span class="cmt">// getters omitted</span>
+}`,
+   options:['The class is not serializable','Missing @TargetAggregateIdentifier on orderId','Missing @CommandHandler annotation','Commands cannot have a String field'],
+   answer:1,
+   explain:'The <strong>orderId</strong> field needs <code>@TargetAggregateIdentifier</code> so Axon knows which aggregate instance to route the command to.'},
+  {id:63,type:'code',topic:'Axon',
+   text:'What does this Saga snippet do?',
+   code:`<span class="ann">@Saga</span>
+<span class="kw">public class</span> <span class="cls">OrderFulfillmentSaga</span> {
+
+    <span class="ann">@Autowired</span>
+    <span class="kw">private transient</span> <span class="cls">CommandGateway</span> commandGateway;
+
+    <span class="ann">@StartSaga</span>
+    <span class="ann">@SagaEventHandler</span>(associationProperty = <span class="str">"orderId"</span>)
+    <span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">OrderCreatedEvent</span> event) {
+        commandGateway.<span class="fn">send</span>(<span class="kw">new</span> <span class="cls">ReserveInventoryCommand</span>(event.<span class="fn">getOrderId</span>()));
+    }
+
+    <span class="ann">@EndSaga</span>
+    <span class="ann">@SagaEventHandler</span>(associationProperty = <span class="str">"orderId"</span>)
+    <span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">InventoryReservedEvent</span> event) { }
+}`,
+   options:['Handles two commands','Starts when OrderCreatedEvent fires, dispatches a ReserveInventoryCommand, ends when InventoryReservedEvent fires','Replays all events','Stores the order in the database'],
+   answer:1,
+   explain:'This Saga orchestrates a two-step process: <strong>@StartSaga</strong> triggers on OrderCreatedEvent and dispatches a command; <strong>@EndSaga</strong> completes the saga when inventory is confirmed.'},
+  {id:64,type:'code',topic:'Axon',
+   text:'What is the purpose of the @QueryHandler method below?',
+   code:`<span class="ann">@Component</span>
+<span class="kw">public class</span> <span class="cls">OrderProjection</span> {
+
+    <span class="kw">private final</span> <span class="cls">OrderRepository</span> repo;
+
+    <span class="ann">@EventHandler</span>
+    <span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">OrderCreatedEvent</span> event) {
+        repo.<span class="fn">save</span>(<span class="kw">new</span> <span class="cls">OrderView</span>(event.<span class="fn">getOrderId</span>(), <span class="str">"CREATED"</span>));
+    }
+
+    <span class="ann">@QueryHandler</span>
+    <span class="kw">public</span> <span class="cls">OrderView</span> <span class="fn">handle</span>(<span class="cls">FindOrderQuery</span> query) {
+        <span class="kw">return</span> repo.<span class="fn">findById</span>(query.<span class="fn">getOrderId</span>()).<span class="fn">orElseThrow</span>();
+    }
+}`,
+   options:['Persists events to the event store','Serves the read model — @EventHandler builds the view, @QueryHandler returns it','Dispatches commands','Creates aggregate instances'],
+   answer:1,
+   explain:'This is a standard Axon projection: <strong>@EventHandler</strong> keeps the read model up-to-date, and <strong>@QueryHandler</strong> serves queries against it.'},
+  {id:65,type:'code',topic:'Axon',
+   text:'What configuration does this snippet set up?',
+   code:`<span class="ann">@Bean</span>
+<span class="kw">public</span> <span class="cls">SnapshotTriggerDefinition</span> <span class="fn">snapshotTrigger</span>(
+        <span class="cls">Snapshotter</span> snapshotter) {
+    <span class="kw">return new</span> <span class="cls">EventCountSnapshotTriggerDefinition</span>(
+            snapshotter, <span class="num">50</span>);
+}`,
+   options:['Takes a snapshot every 50 seconds','Takes a snapshot every 50 events applied to an aggregate','Limits the event store to 50 events','Disables event sourcing after 50 commands'],
+   answer:1,
+   explain:'<strong>EventCountSnapshotTriggerDefinition(snapshotter, 50)</strong> creates a snapshot after every 50 events on an aggregate, optimizing future load times.'},
+  {id:66,type:'code',topic:'Event Sourcing',
+   text:'What pattern does this event class demonstrate?',
+   code:`<span class="ann">@Revision</span>(<span class="str">"2"</span>)
+<span class="kw">public class</span> <span class="cls">OrderCreatedEvent</span> {
+    <span class="kw">private final</span> String orderId;
+    <span class="kw">private final</span> String customerId; <span class="cmt">// new in v2</span>
+    <span class="kw">private final</span> <span class="cls">BigDecimal</span> totalAmount;
+}`,
+   options:['Snapshot definition','Event versioning / schema evolution','Command routing','Saga state tracking'],
+   answer:1,
+   explain:'<strong>@Revision("2")</strong> marks this as version 2 of the event. An upcaster would convert stored v1 events (without customerId) to v2 during replay.'},
+  {id:67,type:'code',topic:'Axon',
+   text:'What does this TrackingEventProcessor configuration achieve?',
+   code:`<span class="ann">@Autowired</span>
+<span class="kw">public void</span> <span class="fn">configure</span>(<span class="cls">EventProcessingConfigurer</span> configurer) {
+    configurer
+        .<span class="fn">registerTrackingEventProcessor</span>(<span class="str">"OrderProcessingGroup"</span>,
+            conf -> conf.<span class="fn">getComponent</span>(<span class="cls">TrackingEventProcessorConfiguration</span>.<span class="kw">class</span>,
+                () -> <span class="cls">TrackingEventProcessorConfiguration</span>
+                    .<span class="fn">forParallelProcessing</span>(<span class="num">4</span>)));
+}`,
+   options:['Creates 4 separate sagas','Registers a tracking processor with 4 parallel threads/segments','Creates 4 aggregates','Limits event replay to 4 events'],
+   answer:1,
+   explain:'This registers <strong>OrderProcessingGroup</strong> as a TrackingEventProcessor with <strong>4 parallel segments</strong>, enabling concurrent event processing.'},
+  {id:68,type:'code',topic:'Axon',
+   text:'What does this upcaster class do?',
+   code:`<span class="kw">public class</span> <span class="cls">OrderCreatedEventUpcaster</span>
+        <span class="kw">extends</span> <span class="cls">SingleEventUpcaster</span> {
+
+    <span class="ann">@Override</span>
+    <span class="kw">protected boolean</span> <span class="fn">canUpcast</span>(<span class="cls">IntermediateEventRepresentation</span> ir) {
+        <span class="kw">return</span> ir.<span class="fn">getType</span>().<span class="fn">getName</span>().<span class="fn">equals</span>(<span class="str">"OrderCreatedEvent"</span>)
+            && ir.<span class="fn">getType</span>().<span class="fn">getRevision</span>().<span class="fn">equals</span>(<span class="str">"1"</span>);
+    }
+
+    <span class="ann">@Override</span>
+    <span class="kw">protected</span> <span class="cls">IntermediateEventRepresentation</span> <span class="fn">doUpcast</span>(
+            <span class="cls">IntermediateEventRepresentation</span> ir) {
+        <span class="kw">return</span> ir.<span class="fn">upcastPayload</span>(<span class="kw">new</span> <span class="cls">MetaData</span>(),
+            <span class="cls">XStreamSerializer</span>.<span class="kw">class</span>, node -> {
+                node.<span class="fn">addValue</span>(<span class="str">"customerId"</span>, <span class="str">"UNKNOWN"</span>);
+            });
+    }
+}`,
+   options:['Deletes v1 events from the store','Converts OrderCreatedEvent v1 to v2 by adding a default customerId field','Encrypts old events','Dispatches commands for old events'],
+   answer:1,
+   explain:'This upcaster intercepts v1 OrderCreatedEvent during deserialization and adds the missing <code>customerId = "UNKNOWN"</code> field, making it compatible with the v2 class.'},
+  {id:69,type:'code',topic:'Axon',
+   text:'What is the role of @AssociationValue in this Saga handler?',
+   code:`<span class="ann">@SagaEventHandler</span>(associationProperty = <span class="str">"orderId"</span>)
+<span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">PaymentReceivedEvent</span> event) {
+    <span class="cls">SagaLifecycle</span>.<span class="fn">associateWith</span>(<span class="str">"paymentId"</span>, event.<span class="fn">getPaymentId</span>());
+    commandGateway.<span class="fn">send</span>(<span class="kw">new</span> <span class="cls">ShipOrderCommand</span>(event.<span class="fn">getOrderId</span>()));
+}`,
+   options:['Stores the saga to the database','Associates the saga instance with a new identifier (paymentId) for future event routing','Ends the saga','Replays all events for the saga'],
+   answer:1,
+   explain:'<code>SagaLifecycle.associateWith()</code> adds an additional association so future events carrying <code>paymentId</code> will also route to this saga instance.'},
+  {id:70,type:'code',topic:'Axon',
+   text:'What does this Spring Boot Axon configuration achieve?',
+   code:`<span class="ann">@SpringBootApplication</span>
+<span class="kw">public class</span> <span class="cls">Application</span> {
+    <span class="ann">@Bean</span>
+    <span class="kw">public</span> <span class="cls">TokenStore</span> <span class="fn">tokenStore</span>(<span class="cls">EntityManager</span> em) {
+        <span class="kw">return</span> <span class="cls">JpaTokenStore</span>.<span class="fn">builder</span>()
+                .<span class="fn">entityManagerProvider</span>(() -> em)
+                .<span class="fn">serializer</span>(<span class="cls">XStreamSerializer</span>.<span class="fn">defaultSerializer</span>())
+                .<span class="fn">build</span>();
+    }
+}`,
+   options:['Configures in-memory token storage','Configures JPA-based token storage for TrackingEventProcessors','Creates an event store','Registers a Saga repository'],
+   answer:1,
+   explain:'A <strong>JpaTokenStore</strong> persists tracking tokens to a database, ensuring TrackingEventProcessors can resume from where they left off after restarts.'},
+  {id:71,type:'qcm',topic:'CQRS',
+   text:'What is a "Read Model" also commonly called in CQRS?',
+   options:['Aggregate Root','Projection or View Model','Command Handler','Domain Service'],
+   answer:1,
+   explain:'Read models are also called <strong>Projections</strong> or <strong>View Models</strong> — they represent query-optimized representations of domain state.'},
+  {id:72,type:'qcm',topic:'Event Sourcing',
+   text:'What is "crypto-shredding" in the context of Event Sourcing and GDPR?',
+   options:['Encrypting all events with a master key','Encrypting PII in events with a per-user key and deleting that key to effectively erase data','Deleting events from the store','Hashing event identifiers'],
+   answer:1,
+   explain:'<strong>Crypto-shredding</strong>: PII is stored encrypted. To "forget" a user, delete their encryption key — the data becomes unreadable without altering events.'},
+  {id:73,type:'tf',topic:'Axon',
+   text:'In Axon, a TrackingEventProcessor can be reset to replay events from the beginning.',
+   answer:true,
+   explain:'Axon provides a ReplayToken that resets the tracking position to the start of the event stream, triggering a full replay.'},
+  {id:74,type:'tf',topic:'CQRS',
+   text:'Commands in CQRS should be named using past tense (e.g., OrderCreated).',
+   answer:false,
+   explain:'Commands use <strong>imperative</strong> names (e.g., CreateOrder, PlaceOrder). Past-tense naming is reserved for <strong>Events</strong> (OrderCreated, OrderShipped).'},
+  {id:75,type:'qcm',topic:'Axon',
+   text:'Which Axon component would you use to handle a subscription query for live updates?',
+   options:['CommandGateway','EventBus','QueryGateway.subscriptionQuery()','SagaManager'],
+   answer:2,
+   explain:'<strong>QueryGateway.subscriptionQuery()</strong> returns both the initial result and a Flux of incremental updates, enabling live push-based query results.'},
+  {id:76,type:'tf',topic:'Event Sourcing',
+   text:'Domain events should contain enough information to reconstruct aggregate state without additional queries.',
+   answer:true,
+   explain:'Events must be self-contained. The @EventSourcingHandler must be able to apply state changes using only the event payload.'},
+  {id:77,type:'qcm',topic:'CQRS',
+   text:'In CQRS, what is "command validation"?',
+   options:['Validating JSON format only','Checking both syntactic validity and business rule compliance before processing','Validating queries','Encrypting commands'],
+   answer:1,
+   explain:'Command validation covers both structural checks (non-null fields) and <strong>domain invariants</strong> (e.g., can\'t cancel a shipped order).'},
+  {id:78,type:'tf',topic:'Axon',
+   text:'Axon\'s @ProcessingGroup annotation can be used to group multiple event handler classes under the same logical processor.',
+   answer:true,
+   explain:'Multiple classes annotated with the same @ProcessingGroup name share a single EventProcessor, useful for coordinating related projections.'},
+  {id:79,type:'qcm',topic:'Event Sourcing',
+   text:'What is the "event log" in Event Sourcing?',
+   options:['Application error logs','The ordered, immutable sequence of all domain events','A debug trace','Query result cache'],
+   answer:1,
+   explain:'The <strong>event log</strong> is the chronological, immutable record of all domain events — it is the single source of truth for system state.'},
+  {id:80,type:'qcm',topic:'Axon',
+   text:'Which Axon feature allows sending a query and receiving a stream of updates over time?',
+   options:['TrackingEventProcessor','Scatter-Gather Query','Subscription Query','Snapshot Trigger'],
+   answer:2,
+   explain:'<strong>Subscription Queries</strong> in Axon return an initial result plus a live update stream, enabling reactive/push-based query patterns.'},
+];
+
+// STATE
+let answers = {};
+let currentFilter = 'all';
+
+function getFiltered() {
+  if (currentFilter === 'all') return questions;
+  if (currentFilter === 'tf') return questions.filter(q => q.type === 'tf');
+  if (currentFilter === 'qcm') return questions.filter(q => q.type === 'qcm');
+  if (currentFilter === 'code') return questions.filter(q => q.type === 'code');
+  return questions;
+}
+
+function switchTab(tab) {
+  currentFilter = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderQuestions();
+  updateStats();
+}
+
+function renderQuestions() {
+  const container = document.getElementById('questionsContainer');
+  const list = getFiltered();
+  container.innerHTML = '';
+
+  list.forEach(q => {
+    const card = document.createElement('div');
+    card.className = 'q-card';
+    card.id = `q-${q.id}`;
+
+    const tagClass = q.type === 'tf' ? 'tag-tf' : q.type === 'code' ? 'tag-code' : 'tag-qcm';
+    const tagLabel = q.type === 'tf' ? 'T/F' : q.type === 'code' ? 'CODE' : 'QCM';
+
+    let bodyHTML = '';
+    if (q.code) {
+      bodyHTML += `<pre><button class="copy-btn" onclick="copyCode(this)">copy</button><code>${q.code}</code></pre>`;
+    }
+
+    if (q.type === 'tf') {
+      const ans = answers[q.id];
+      const trueClass = ans === true ? (ans === q.answer ? 'correct' : 'wrong') : (ans !== undefined && q.answer === true ? 'revealed' : '');
+      const falseClass = ans === false ? (ans === q.answer ? 'correct' : 'wrong') : (ans !== undefined && q.answer === false ? 'revealed' : '');
+      bodyHTML += `<div class="tf-row">
+        <button class="tf-btn ${trueClass}" onclick="answerTF(${q.id}, true)" ${ans !== undefined ? 'disabled' : ''}>TRUE</button>
+        <button class="tf-btn ${falseClass}" onclick="answerTF(${q.id}, false)" ${ans !== undefined ? 'disabled' : ''}>FALSE</button>
+      </div>`;
+    } else {
+      bodyHTML += `<div class="options">`;
+      q.options.forEach((opt, i) => {
+        const ans = answers[q.id];
+        let cls = '';
+        if (ans !== undefined) {
+          if (i === q.answer) cls = ans === i ? 'correct' : 'revealed-correct';
+          else if (i === ans) cls = 'wrong';
+        }
+        bodyHTML += `<button class="opt-btn ${cls}" onclick="answerQCM(${q.id}, ${i})" ${ans !== undefined ? 'disabled' : ''}>
+          <span class="opt-label">${String.fromCharCode(65+i)}</span>
+          <span>${opt}</span>
+        </button>`;
+      });
+      bodyHTML += `</div>`;
+    }
+
+    const showExp = answers[q.id] !== undefined ? 'show' : '';
+    bodyHTML += `<div class="explanation ${showExp}" id="exp-${q.id}">${q.explain}</div>`;
+
+    card.innerHTML = `
+      <div class="q-header">
+        <div class="q-num">${q.id}</div>
+        <div class="q-text">${q.text}</div>
+        <span class="q-tag ${tagClass}">${tagLabel}</span>
+      </div>
+      ${bodyHTML}
+    `;
+    container.appendChild(card);
+  });
+}
+
+function answerTF(id, val) {
+  if (answers[id] !== undefined) return;
+  answers[id] = val;
+  updateStats();
+  rerenderQuestion(id);
+}
+
+function answerQCM(id, idx) {
+  if (answers[id] !== undefined) return;
+  answers[id] = idx;
+  updateStats();
+  rerenderQuestion(id);
+}
+
+function rerenderQuestion(id) {
+  const q = questions.find(x => x.id === id);
+  const card = document.getElementById(`q-${id}`);
+  if (!card) return;
+
+  if (q.type === 'tf') {
+    const ans = answers[id];
+    const btns = card.querySelectorAll('.tf-btn');
+    btns[0].className = 'tf-btn ' + (ans === true ? (true === q.answer ? 'correct' : 'wrong') : (q.answer === true ? 'revealed' : ''));
+    btns[1].className = 'tf-btn ' + (ans === false ? (false === q.answer ? 'correct' : 'wrong') : (q.answer === false ? 'revealed' : ''));
+    btns.forEach(b => b.disabled = true);
+  } else {
+    const ans = answers[id];
+    const btns = card.querySelectorAll('.opt-btn');
+    btns.forEach((btn, i) => {
+      let cls = '';
+      if (i === q.answer) cls = ans === i ? 'correct' : 'revealed-correct';
+      else if (i === ans) cls = 'wrong';
+      btn.className = `opt-btn ${cls}`;
+      btn.disabled = true;
+    });
+  }
+  const exp = document.getElementById(`exp-${id}`);
+  if (exp) exp.classList.add('show');
+}
+
+function updateStats() {
+  const all = questions.length;
+  const answered = Object.keys(answers).length;
+  let correct = 0;
+  questions.forEach(q => {
+    if (answers[q.id] !== undefined && answers[q.id] === q.answer) correct++;
+  });
+  const wrong = answered - correct;
+  const score = answered > 0 ? Math.round(correct / answered * 100) : null;
+
+  document.getElementById('statTotal').textContent = all;
+  document.getElementById('statAnswered').textContent = answered;
+  document.getElementById('statCorrect').textContent = correct;
+  document.getElementById('statWrong').textContent = wrong;
+  document.getElementById('statScore').textContent = score !== null ? score + '%' : '—';
+  document.getElementById('progressBar').style.width = (answered / all * 100) + '%';
+
+  if (answered === all) showScore(score, correct, all);
+}
+
+function showScore(score, correct, total) {
+  document.getElementById('finalScore').textContent = score + '%';
+  document.getElementById('finalDetail').textContent = `${correct} correct out of ${total} questions`;
+  document.getElementById('scoreOverlay').style.display = 'flex';
+}
+
+function closeScore() {
+  document.getElementById('scoreOverlay').style.display = 'none';
+}
+
+function resetAll() {
+  if (!confirm('Reset all answers?')) return;
+  answers = {};
+  updateStats();
+  renderQuestions();
+}
+
+function copyCode(btn) {
+  const code = btn.nextElementSibling.textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    btn.textContent = 'copied!';
+    setTimeout(() => btn.textContent = 'copy', 1500);
+  });
+}
+
+// Init
+renderQuestions();
+updateStats();
+</script>
+</body>
+</html>

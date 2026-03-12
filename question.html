@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>10 Q&A — CQRS + Event Sourcing + Axon</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #faf7f2;
+    --ink: #1a1410;
+    --ink2: #3d3530;
+    --muted: #9c8f84;
+    --border: #e4ddd5;
+    --card: #ffffff;
+    --accent: #c0392b;
+    --accent2: #2980b9;
+    --accent3: #27ae60;
+    --accent-warm: #e67e22;
+    --tag-bg: #f0ebe4;
+    --code-bg: #1a1410;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'DM Serif Display', Georgia, serif;
+    min-height: 100vh;
+    padding-bottom: 4rem;
+  }
+
+  /* ── DECORATIVE LINES ── */
+  body::before {
+    content: '';
+    position: fixed; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-warm), var(--accent2), var(--accent3));
+    z-index: 100;
+  }
+
+  /* ── HEADER ── */
+  header {
+    max-width: 760px; margin: 0 auto;
+    padding: 3.5rem 2rem 2.5rem;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+
+  .header-eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: .65rem; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: .8rem;
+    display: flex; align-items: center; gap: .5rem;
+  }
+  .header-eyebrow::after {
+    content: ''; flex: 1; height: 1px; background: var(--border); max-width: 60px;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 400; line-height: 1.1;
+    letter-spacing: -.02em; color: var(--ink);
+    margin-bottom: .6rem;
+  }
+  h1 em { font-style: italic; color: var(--accent); }
+
+  .header-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: .78rem; color: var(--muted); margin-top: .8rem;
+    display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+  }
+  .header-sub span { display: flex; align-items: center; gap: .35rem; }
+
+  /* SCORE STRIP */
+  .score-strip {
+    max-width: 760px; margin: 0 auto;
+    padding: 1rem 2rem;
+    display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    font-family: 'DM Mono', monospace; font-size: .72rem; color: var(--muted);
+  }
+  .score-pill {
+    display: inline-flex; align-items: center; gap: .4rem;
+    background: var(--tag-bg); border: 1px solid var(--border);
+    border-radius: 20px; padding: .3rem .8rem; font-size: .7rem;
+  }
+  .score-pill .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .dot-green { background: var(--accent3); }
+  .dot-red   { background: var(--accent); }
+  .dot-gray  { background: var(--border); }
+  .prog-outer {
+    flex: 1; min-width: 120px; height: 4px;
+    background: var(--border); border-radius: 2px; overflow: hidden;
+  }
+  .prog-inner {
+    height: 100%; width: 0%; border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent3), var(--accent2));
+    transition: width .5s cubic-bezier(.4,0,.2,1);
+  }
+
+  /* ── MAIN ── */
+  .main { max-width: 760px; margin: 0 auto; padding: 0 2rem; }
+
+  /* ── Q CARD ── */
+  .q-wrap {
+    margin-top: 2.2rem;
+    animation: fadeIn .4s ease both;
+  }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+  .q-num-row {
+    display: flex; align-items: center; gap: .7rem; margin-bottom: .9rem;
+  }
+  .q-num {
+    font-family: 'DM Mono', monospace; font-size: .65rem; font-weight: 500;
+    color: var(--accent); letter-spacing: .08em;
+  }
+  .q-line { flex: 1; height: 1px; background: var(--border); }
+  .q-topic {
+    font-family: 'DM Mono', monospace; font-size: .6rem; color: var(--muted);
+    background: var(--tag-bg); border: 1px solid var(--border);
+    border-radius: 3px; padding: .15rem .45rem; letter-spacing: .05em;
+  }
+
+  .q-text {
+    font-size: 1.25rem; font-weight: 400; line-height: 1.45;
+    color: var(--ink); margin-bottom: 1.1rem;
+  }
+
+  /* CODE IN QUESTION */
+  pre.q-code {
+    background: var(--code-bg); border-radius: 8px;
+    padding: 1rem 1.1rem; margin-bottom: 1.1rem;
+    overflow-x: auto; font-family: 'DM Mono', monospace;
+    font-size: .73rem; line-height: 1.75; color: #c9d4b5;
+    border-left: 3px solid var(--accent);
+  }
+  .kw  { color: #f0956f; }
+  .cls { color: #ffd580; }
+  .fn  { color: #95e6cb; }
+  .str { color: #a8d8ea; }
+  .cmt { color: #5a6e4a; font-style: italic; }
+  .ann { color: #d4a4fb; }
+  .num { color: #ffb3c1; }
+
+  /* ANSWER REVEAL */
+  .answer-btn {
+    display: inline-flex; align-items: center; gap: .5rem;
+    background: none; border: 1.5px solid var(--ink);
+    color: var(--ink); border-radius: 6px; padding: .55rem 1.2rem;
+    font-family: 'DM Mono', monospace; font-size: .72rem; font-weight: 500;
+    cursor: pointer; transition: all .18s; letter-spacing: .03em;
+  }
+  .answer-btn:hover { background: var(--ink); color: var(--bg); }
+  .answer-btn.revealed { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .answer-box {
+    display: none; margin-top: 1rem;
+    border-left: 3px solid var(--accent3);
+    padding: 1.1rem 1.3rem;
+    background: var(--card);
+    border-radius: 0 8px 8px 0;
+    box-shadow: 0 2px 12px rgba(0,0,0,.06);
+    animation: slideDown .25s ease;
+  }
+  @keyframes slideDown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+  .answer-box.show { display: block; }
+
+  .answer-label {
+    font-family: 'DM Mono', monospace; font-size: .6rem;
+    text-transform: uppercase; letter-spacing: .12em;
+    color: var(--accent3); margin-bottom: .55rem; font-weight: 500;
+  }
+  .answer-text {
+    font-size: .97rem; line-height: 1.75; color: var(--ink2);
+  }
+  .answer-text strong { color: var(--ink); font-weight: 600; }
+  .answer-text code {
+    font-family: 'DM Mono', monospace; font-size: .82em;
+    background: var(--tag-bg); border: 1px solid var(--border);
+    border-radius: 3px; padding: .1em .35em; color: var(--accent);
+  }
+
+  pre.a-code {
+    background: var(--code-bg); border-radius: 6px;
+    padding: .9rem 1rem; margin-top: .7rem; overflow-x: auto;
+    font-family: 'DM Mono', monospace; font-size: .72rem;
+    line-height: 1.75; color: #c9d4b5;
+  }
+
+  /* SELF RATE */
+  .rate-row {
+    display: flex; align-items: center; gap: .5rem; margin-top: .9rem;
+    padding-top: .7rem; border-top: 1px solid var(--border);
+    font-family: 'DM Mono', monospace; font-size: .65rem; color: var(--muted);
+  }
+  .rate-btn {
+    background: none; border: 1px solid var(--border); border-radius: 4px;
+    padding: .25rem .7rem; cursor: pointer; font-family: 'DM Mono', monospace;
+    font-size: .65rem; color: var(--muted); transition: all .15s;
+  }
+  .rate-btn:hover { border-color: var(--ink2); color: var(--ink); }
+  .rate-btn.sel-got { border-color: var(--accent3); color: var(--accent3); background: rgba(39,174,96,.06); }
+  .rate-btn.sel-missed { border-color: var(--accent); color: var(--accent); background: rgba(192,57,43,.06); }
+
+  /* DIVIDER */
+  .section-divider {
+    display: flex; align-items: center; gap: 1rem;
+    margin: 3rem 0 0; font-family: 'DM Mono', monospace;
+    font-size: .65rem; color: var(--muted); letter-spacing: .1em; text-transform: uppercase;
+  }
+  .section-divider::before, .section-divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* FINAL CARD */
+  .final-card {
+    margin-top: 3rem; padding: 2rem 2rem;
+    background: var(--ink); color: var(--bg);
+    border-radius: 12px; text-align: center;
+  }
+  .final-score { font-size: 3.5rem; font-weight: 400; line-height: 1; }
+  .final-label { font-family: 'DM Mono', monospace; font-size: .7rem; color: #9c8f84; letter-spacing: .1em; margin-top: .3rem; }
+  .final-msg { font-size: 1.05rem; font-style: italic; color: #d5cec6; margin-top: 1rem; }
+  .reset-btn {
+    margin-top: 1.5rem; background: none; border: 1px solid #4a3f35;
+    color: #9c8f84; font-family: 'DM Mono', monospace; font-size: .7rem;
+    padding: .5rem 1.2rem; border-radius: 6px; cursor: pointer; transition: all .2s;
+  }
+  .reset-btn:hover { border-color: #9c8f84; color: var(--bg); }
+
+  @media(max-width:600px) {
+    header, .main, .score-strip { padding-left: 1.2rem; padding-right: 1.2rem; }
+    h1 { font-size: 1.9rem; }
+    .q-text { font-size: 1.1rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-eyebrow">Interview Prep · 10 Questions</div>
+  <h1>CQRS + Event Sourcing<br>+ <em>Axon</em> — Q&amp;A</h1>
+  <div class="header-sub">
+    <span>📖 Based on the step-by-step guide</span>
+    <span>⏱ ~15 min review</span>
+    <span>🎯 Read each answer, rate yourself</span>
+  </div>
+</header>
+
+<div class="score-strip">
+  <span id="scoreText">0 / 10 answered</span>
+  <span class="score-pill"><span class="dot dot-green"></span><span id="gotCount">0</span> got it</span>
+  <span class="score-pill"><span class="dot dot-red"></span><span id="missedCount">0</span> missed</span>
+  <div class="prog-outer"><div class="prog-inner" id="progBar"></div></div>
+</div>
+
+<div class="main">
+
+  <!-- Q1 -->
+  <div class="q-wrap" style="animation-delay:.05s">
+    <div class="q-num-row">
+      <span class="q-num">Q 01</span><div class="q-line"></div>
+      <span class="q-topic">CQRS — Architecture</span>
+    </div>
+    <div class="q-text">What does CQRS stand for, and what is the core idea behind separating commands from queries?</div>
+    <button class="answer-btn" onclick="reveal(this, 1)">▶ Show Answer</button>
+    <div class="answer-box" id="ans-1">
+      <div class="answer-label">✦ Answer</div>
+      <div class="answer-text">
+        <strong>CQRS = Command Query Responsibility Segregation.</strong><br><br>
+        The core idea: <strong>commands</strong> (write operations that change state) and <strong>queries</strong> (read operations that return data) are handled by <em>completely separate models</em>.<br><br>
+        • A <strong>Command</strong> expresses intent to change state — it returns nothing (or just an acknowledgement). Example: <code>CreateOrderCommand</code>.<br>
+        • A <strong>Query</strong> returns data and has <em>no side effects</em>. Example: <code>FindOrderByIdQuery</code>.<br><br>
+        This separation lets you optimize each side independently — the write side for consistency and business rules, the read side for fast querying (different DB, different schema).
+      </div>
+      <div class="rate-row">
+        Did you know this?
+        <button class="rate-btn" onclick="rate(this,'got',1)">✓ Got it</button>
+        <button class="rate-btn" onclick="rate(this,'missed',1)">✗ Missed it</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-divider">Project Setup</div>
+
+  <!-- Q2 -->
+  <div class="q-wrap" style="animation-delay:.1s">
+    <div class="q-num-row">
+      <span class="q-num">Q 02</span><div class="q-line"></div>
+      <span class="q-topic">Axon — Setup</span>
+    </div>
+    <div class="q-text">In the guide's <code>application.yml</code>, why do we set <code>axon.axonserver.enabled: false</code>? What happens if we don't?</div>
+    <button class="answer-btn" onclick="reveal(this, 2)">▶ Show Answer</button>
+    <div class="answer-box" id="ans-2">
+      <div class="answer-label">✦ Answer</div>
+      <div class="answer-text">
+        By default, Axon Framework tries to <strong>connect to Axon Server</strong> (a separate process) on startup for message routing and event storage.<br><br>
+        Setting <code>axon.axonserver.enabled: false</code> tells Axon to use its <strong>embedded infrastructure</strong> instead:
+        <ul style="margin:.6rem 0 .6rem 1.2rem;line-height:2;">
+          <li>An in-process <strong>EmbeddedEventStore</strong> backed by JPA (H2 in dev)</li>
+          <li>An in-memory <strong>SimpleCommandBus</strong> and <strong>SimpleEventBus</strong></li>
+        </ul>
+        Without this flag and without Axon Server running, the application <strong>fails to start</strong> with a connection refused error. For local development without external infrastructure, always disable it.
+      </div>
+      <pre class="a-code"><span class="cmt"># application.yml</span>
+<span class="cls">axon</span>:
+  <span class="cls">axonserver</span>:
+    <span class="cls">enabled</span>: <span class="kw">false</span>   <span class="cmt"># use embedded event store (JPA)</span></pre>
+      <div class="rate-row">
+        Did you know this?
+        <button class="rate-btn" onclick="rate(this,'got',2)">✓ Got it</button>
+        <button class="rate-btn" onclick="rate(this,'missed',2)">✗ Missed it</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-divider">Commands &amp; Events</div>
+
+  <!-- Q3 -->
+  <div class="q-wrap" style="animation-delay:.15s">
+    <div class="q-num-row">
+      <span class="q-num">Q 03</span><div class="q-line"></div>
+      <span class="q-topic">Axon — Commands</span>
+    </div>
+    <div class="q-text">What is <code>@TargetAggregateIdentifier</code> and what goes wrong if you forget it on a command?</div>
+    <pre class="q-code"><span class="kw">public record</span> <span class="cls">ShipOrderCommand</span>(
+    String orderId,        <span class="cmt">// ← missing annotation!</span>
+    String shippingAddress
+) {}</pre>
+    <button class="answer-btn" onclick="reveal(this, 3)">▶ Show Answer</button>
+    <div class="answer-box" id="ans-3">
+      <div class="answer-label">✦ Answer</div>
+      <div class="answer-text">
+        <code>@TargetAggregateIdentifier</code> marks the field that holds the <strong>aggregate instance ID</strong>. Axon's CommandBus reads this value to route the command to the <em>correct</em> aggregate instance in the repository.<br><br>
+        <strong>Without it:</strong> Axon cannot determine which aggregate to load. The dispatch throws an <code>AxonConfigurationException</code> at startup — or the command gets routed to a <em>wrong/new</em> aggregate instance, causing bugs that are very hard to debug.
+      </div>
+      <pre class="a-code"><span class="kw">public record</span> <span class="cls">ShipOrderCommand</span>(
+    <span class="ann">@TargetAggregateIdentifier</span>   <span class="cmt">// ✓ required!</span>
+    <span class="cls">String</span> orderId,
+    <span class="cls">String</span> shippingAddress
+) {}</pre>
+      <div class="rate-row">
+        Did you know this?
+        <button class="rate-btn" onclick="rate(this,'got',3)">✓ Got it</button>
+        <button class="rate-btn" onclick="rate(this,'missed',3)">✗ Missed it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Q4 -->
+  <div class="q-wrap" style="animation-delay:.2s">
+    <div class="q-num-row">
+      <span class="q-num">Q 04</span><div class="q-line"></div>
+      <span class="q-topic">Event Sourcing — Events</span>
+    </div>
+    <div class="q-text">Why must events be <strong>immutable</strong> and named in the <strong>past tense</strong>? Give one concrete example of each rule.</div>
+    <button class="answer-btn" onclick="reveal(this, 4)">▶ Show Answer</button>
+    <div class="answer-box" id="ans-4">
+      <div class="answer-label">✦ Answer</div>
+      <div class="answer-text">
+        <strong>Immutability</strong> — Events represent <em>facts that already happened</em>. Mutating a stored event would mean rewriting history, which destroys the entire audit trail and breaks aggregate state reconstruction (replay would produce wrong results).<br>
+        → Example: <code>OrderCreatedEvent</code> is a Java <code>record</code> — all fields are final by design.<br><br>
+        <strong>Past tense</strong> — Events describe what <em>occurred</em>, not what you want. Using imperative names (<code>CreateOrder</code>) would confuse events with commands — a critical conceptual error in CQRS.<br>
+        → Example: Use <code>OrderShippedEvent</code> ✓, not <code>ShipOrderEvent</code> ✗.
+      </div>
+      <pre class="a-code"><span class="cmt">// ✓ Correct: past-tense, immutable record</span>
+<span class="kw">public record</span> <span class="cls">OrderShippedEvent</span>(
+    <span class="cls">String</span> orderId,
+    <span class="cls">String</span> shippingAddress
+) {}
+
+<span class="cmt">// ✗ Wrong: imperative name, mutable fields</span>
+<span class="kw">public class</span> <span class="cls">ShipOrderEvent</span> {
+    <span class="kw">public</span> String orderId; <span class="cmt">// mutable — bad!</span>
+}</span></pre>
+      <div class="rate-row">
+        Did you know this?
+        <button class="rate-btn" onclick="rate(this,'got',4)">✓ Got it</button>
+        <button class="rate-btn" onclick="rate(this,'missed',4)">✗ Missed it</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-divider">The Aggregate</div>
+
+  <!-- Q5 -->
+  <div class="q-wrap" style="animation-delay:.25s">
+    <div class="q-num-row">
+      <span class="q-num">Q 05</span><div class="q-line"></div>
+      <span class="q-topic">Axon — Aggregate</span>
+    </div>
+    <div class="q-text">Look at this aggregate command handler. What is the critical mistake and why will it break Event Sourcing?</div>
+    <pre class="q-code"><span class="ann">@CommandHandler</span>
+<span class="kw">public</span> <span class="fn">OrderAggregate</span>(<span class="cls">CreateOrderCommand</span> cmd) {
+    <span class="cmt">// ← setting state directly — is this ok?</span>
+    <span class="kw">this</span>.orderId = cmd.<span class="fn">orderId</span>();
+    <span class="kw">this</span>.status  = OrderStatus.CREATED;
+    <span class="cmt">// no apply() call...</span>
+}</pre>
+    <button class="answer-btn" onclick="reveal(this, 5)">▶ Show Answer</button>
+    <div class="answer-box" id="ans-5">
+      <div class="answer-label">✦ Answer</div>
+      <div class="answer-text">
+        <strong>Critical mistake:</strong> State is being set <em>directly</em> in the command handler instead of calling <code>AggregateLifecycle.apply(event)</code>.<br><br>
+        <strong>Why it breaks Event Sourcing:</strong>
+        <ul style="margin:.6rem 0 .6rem 1.2rem;line-height:2;">
+          <li>No event is published → <strong>nothing is stored</strong> in the event store</li>
+          <li>The next time this aggregate is loaded, there are no events to replay → the aggregate starts completely <em>empty</em> — <code>status = null</code></li>
+          <li>The entire audit trail is lost</li>
+        </ul>
+        State must <strong>only</strong> be set in <code>@EventSourcingHandler</code> methods, never in command handlers.
+      </div>
+      <pre class="a-code"><span class="cmt">// ✓ Correct</span>
+<span class="ann">@CommandHandler</span>
+<span class="kw">public</span> <span class="fn">OrderAggregate</span>(<span class="cls">CreateOrderCommand</span> cmd) {
+    <span class="fn">apply</span>(<span class="kw">new</span> <span class="cls">OrderCreatedEvent</span>(cmd.<span class="fn">orderId</span>(), ...)); <span class="cmt">// ← publish event</span>
+}
+
+<span class="ann">@EventSourcingHandler</span>
+<span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">OrderCreatedEvent</span> e) {
+    <span class="kw">this</span>.orderId = e.<span class="fn">orderId</span>();   <span class="cmt">// ← state set here ONLY</span>
+    <span class="kw">this</span>.status  = <span class="cls">OrderStatus</span>.CREATED;
+}</pre>
+      <div class="rate-row">
+        Did you know this?
+        <button class="rate-btn" onclick="rate(this,'got',5)">✓ Got it</button>
+        <button class="rate-btn" onclick="rate(this,'missed',5)">✗ Missed it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Q6 -->
+  <div class="q-wrap" style="animation-delay:.3s">
+    <div class="q-num-row">
+      <span class="q-num">Q 06</span><div class="q-line"></div>
+      <span class="q-topic">Axon — Aggregate</span>
+    </div>
+    <div class="q-text">Why does an Axon aggregate need a <strong>protected no-arg constructor</strong>? When does Axon use it?</div>
+    <button class="answer-btn" onclick="reveal(this, 6)">▶ Show Answer</button>
+    <div class="answer-box" id="ans-6">
+      <div class="answer-label">✦ Answer</div>
+      <div class="answer-text">
+        Axon uses the no-arg constructor when <strong>loading an existing aggregate from the event store</strong> (i.e., when processing a command on an already-created order).<br><br>
+        The process is:
+        <ol style="margin:.6rem 0 .6rem 1.2rem;line-height:2;">
+          <li>Axon calls the <strong>no-arg constructor</strong> to create an empty shell</li>
+          <li>It fetches all stored events for that aggregate ID from the event store</li>
+          <li>It replays them one by one through the <strong>@EventSourcingHandler</strong> methods</li>
+          <li>After replay, the aggregate is fully hydrated and ready to handle the new command</li>
+        </ol>
+        Without the no-arg constructor, Java/Axon cannot instantiate the aggregate before replaying and throws an exception.
+      </div>
+      <pre class="a-code"><span class="ann">@Aggregate</span>
+<span class="kw">public class</span> <span class="cls">OrderAggregate</span> {
+
+    <span class="cmt">// Required! Axon calls this before event replay</span>
+    <span class="kw">protected</span> <span class="fn">OrderAggregate</span>() {}
+
+    <span class="cmt">// This constructor is only for CREATE command</span>
+    <span class="ann">@CommandHandler</span>
+    <span class="kw">public</span> <span class="fn">OrderAggregate</span>(<span class="cls">CreateOrderCommand</span> cmd) { ... }
+}</pre>
+      <div class="rate-row">
+        Did you know this?
+        <button class="rate-btn" onclick="rate(this,'got',6)">✓ Got it</button>
+        <button class="rate-btn" onclick="rate(this,'missed',6)">✗ Missed it</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-divider">Read Side</div>
+
+  <!-- Q7 -->
+  <div class="q-wrap" style="animation-delay:.35s">
+    <div class="q-num-row">
+      <span class="q-num">Q 07</span><div class="q-line"></div>
+      <span class="q-topic">CQRS — Projection</span>
+    </div>
+    <div class="q-text">Explain the difference between <code>@EventSourcingHandler</code> and <code>@EventHandler</code> in Axon. Can they be in the same class?</div>
+    <button class="answer-btn" onclick="reveal(this, 7)">▶ Show Answer</button>
+    <div class="answer-box" id="ans-7">
+      <div class="answer-label">✦ Answer</div>
+      <div class="answer-text">
+        They look similar but serve very different purposes:<br><br>
+        <strong>@EventSourcingHandler</strong><br>
+        → Lives <em>inside</em> an <code>@Aggregate</code> class<br>
+        → Called to mutate <strong>aggregate state</strong> during command processing AND event replay<br>
+        → Part of the <strong>write side</strong><br><br>
+        <strong>@EventHandler</strong><br>
+        → Lives in a plain Spring <code>@Component</code> (e.g., a Projection)<br>
+        → Called to update <strong>read model</strong> data (JPA entity, Redis, etc.)<br>
+        → Part of the <strong>read side</strong>, runs asynchronously via the EventBus<br><br>
+        <strong>Can they be in the same class?</strong> No — <code>@EventSourcingHandler</code> only works inside <code>@Aggregate</code>. <code>@EventHandler</code> works in regular Spring beans. Mixing them would violate the CQRS separation.
+      </div>
+      <pre class="a-code"><span class="cmt">// WRITE SIDE — inside @Aggregate</span>
+<span class="ann">@EventSourcingHandler</span>
+<span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">OrderCreatedEvent</span> e) {
+    <span class="kw">this</span>.status = <span class="cls">OrderStatus</span>.CREATED; <span class="cmt">// mutate aggregate state</span>
+}
+
+<span class="cmt">// READ SIDE — inside @Component projection</span>
+<span class="ann">@EventHandler</span>
+<span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">OrderCreatedEvent</span> e) {
+    repo.<span class="fn">save</span>(<span class="kw">new</span> <span class="cls">OrderView</span>(e.<span class="fn">orderId</span>(), <span class="str">"CREATED"</span>)); <span class="cmt">// update read DB</span>
+}</pre>
+      <div class="rate-row">
+        Did you know this?
+        <button class="rate-btn" onclick="rate(this,'got',7)">✓ Got it</button>
+        <button class="rate-btn" onclick="rate(this,'missed',7)">✗ Missed it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Q8 -->
+  <div class="q-wrap" style="animation-delay:.4s">
+    <div class="q-num-row">
+      <span class="q-num">Q 08</span><div class="q-line"></div>
+      <span class="q-topic">Axon — Query</span>
+    </div>
+    <div class="q-text">How do you dispatch a query in Axon and get back a single result? Write the controller code for fetching an order by ID.</div>
+    <button class="answer-btn" onclick="reveal(this, 8)">▶ Show Answer</button>
+    <div class="answer-box" id="ans-8">
+      <div class="answer-label">✦ Answer</div>
+      <div class="answer-text">
+        Use <strong>QueryGateway.query()</strong>, passing the query object and a <code>ResponseTypes</code> descriptor that tells Axon the expected return type. It returns a <code>CompletableFuture</code> — call <code>.join()</code> to block and get the result synchronously.
+      </div>
+      <pre class="a-code"><span class="cmt">// 1. Query object</span>
+<span class="kw">public record</span> <span class="cls">FindOrderByIdQuery</span>(<span class="cls">String</span> orderId) {}
+
+<span class="cmt">// 2. Query handler (in projection)</span>
+<span class="ann">@QueryHandler</span>
+<span class="kw">public</span> <span class="cls">OrderView</span> <span class="fn">handle</span>(<span class="cls">FindOrderByIdQuery</span> q) {
+    <span class="kw">return</span> repo.<span class="fn">findById</span>(q.<span class="fn">orderId</span>()).<span class="fn">orElseThrow</span>();
+}
+
+<span class="cmt">// 3. Controller — dispatch the query</span>
+<span class="ann">@GetMapping</span>(<span class="str">"/{id}"</span>)
+<span class="kw">public</span> <span class="cls">OrderView</span> <span class="fn">getOrder</span>(<span class="ann">@PathVariable</span> <span class="cls">String</span> id) {
+    <span class="kw">return</span> queryGateway.<span class="fn">query</span>(
+        <span class="kw">new</span> <span class="cls">FindOrderByIdQuery</span>(id),
+        <span class="cls">ResponseTypes</span>.<span class="fn">instanceOf</span>(<span class="cls">OrderView</span>.<span class="kw">class</span>)  <span class="cmt">// expected type</span>
+    ).<span class="fn">join</span>();  <span class="cmt">// block and return</span>
+}</pre>
+      <div class="rate-row">
+        Did you know this?
+        <button class="rate-btn" onclick="rate(this,'got',8)">✓ Got it</button>
+        <button class="rate-btn" onclick="rate(this,'missed',8)">✗ Missed it</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-divider">Advanced — Saga &amp; Snapshots</div>
+
+  <!-- Q9 -->
+  <div class="q-wrap" style="animation-delay:.45s">
+    <div class="q-num-row">
+      <span class="q-num">Q 09</span><div class="q-line"></div>
+      <span class="q-topic">Axon — Saga</span>
+    </div>
+    <div class="q-text">In the guide's <code>OrderProcessingSaga</code>, what does <code>associationProperty = "orderId"</code> mean, and why is it essential?</div>
+    <pre class="q-code"><span class="ann">@StartSaga</span>
+<span class="ann">@SagaEventHandler</span>(associationProperty = <span class="str">"orderId"</span>)
+<span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">OrderCreatedEvent</span> event) { ... }</pre>
+    <button class="answer-btn" onclick="reveal(this, 9)">▶ Show Answer</button>
+    <div class="answer-box" id="ans-9">
+      <div class="answer-label">✦ Answer</div>
+      <div class="answer-text">
+        <code>associationProperty = "orderId"</code> tells Axon to <strong>link this saga instance</strong> to the value of the <code>orderId</code> field in the incoming event.<br><br>
+        <strong>Why it's essential:</strong> There can be thousands of saga instances running concurrently (one per order). When a new event arrives (e.g., <code>OrderConfirmedEvent</code> for order #42), Axon needs to know <em>which specific saga instance</em> should handle it — it looks up sagas associated with <code>orderId = "42"</code>.<br><br>
+        Without <code>associationProperty</code>, Axon cannot correlate events to their saga instances, and the saga can never progress past the first event.
+      </div>
+      <pre class="a-code"><span class="cmt">// Axon internally does this lookup:</span>
+<span class="cmt">// "Find all saga instances where orderId = event.orderId()"</span>
+<span class="cmt">// → routes the event to the correct saga instance only</span>
+
+<span class="ann">@SagaEventHandler</span>(associationProperty = <span class="str">"orderId"</span>)
+<span class="kw">public void</span> <span class="fn">on</span>(<span class="cls">OrderConfirmedEvent</span> e) {
+    <span class="cmt">// This runs ONLY for the saga associated with e.orderId()</span>
+    commandGateway.<span class="fn">send</span>(<span class="kw">new</span> <span class="cls">ShipOrderCommand</span>(e.<span class="fn">orderId</span>(), ...));
+}</pre>
+      <div class="rate-row">
+        Did you know this?
+        <button class="rate-btn" onclick="rate(this,'got',9)">✓ Got it</button>
+        <button class="rate-btn" onclick="rate(this,'missed',9)">✗ Missed it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Q10 -->
+  <div class="q-wrap" style="animation-delay:.5s">
+    <div class="q-num-row">
+      <span class="q-num">Q 10</span><div class="q-line"></div>
+      <span class="q-topic">Event Sourcing — Snapshots</span>
+    </div>
+    <div class="q-text">An order aggregate has accumulated <strong>200 events</strong>. Explain step by step what happens when Axon loads it — both <em>without</em> and <em>with</em> a snapshot configured at every 50 events.</div>
+    <button class="answer-btn" onclick="reveal(this, 10)">▶ Show Answer</button>
+    <div class="answer-box" id="ans-10">
+      <div class="answer-label">✦ Answer</div>
+      <div class="answer-text">
+        <strong>Without snapshot (naive replay):</strong>
+        <ol style="margin:.5rem 0 .8rem 1.2rem;line-height:2.1;">
+          <li>Axon creates an empty aggregate (no-arg constructor)</li>
+          <li>Fetches all 200 events from the event store</li>
+          <li>Calls <code>@EventSourcingHandler</code> 200 times in sequence</li>
+          <li>Aggregate is finally ready — but this is slow at scale</li>
+        </ol>
+        <strong>With snapshot (every 50 events):</strong>
+        <ol style="margin:.5rem 0 .8rem 1.2rem;line-height:2.1;">
+          <li>After event #50, Axon automatically saves a <strong>snapshot</strong> (full serialized aggregate state)</li>
+          <li>Same at #100, #150, #200</li>
+          <li>Next load: Axon finds the <strong>latest snapshot</strong> (at event #200 in this case)</li>
+          <li>Deserializes the snapshot directly — <em>no event replay needed at all</em></li>
+          <li>Aggregate is ready instantly</li>
+        </ol>
+        Without new events after the snapshot, load time drops from O(N) to O(1).
+      </div>
+      <pre class="a-code"><span class="cmt">// Config: snapshot every 50 events</span>
+<span class="ann">@Bean</span>
+<span class="kw">public</span> <span class="cls">SnapshotTriggerDefinition</span> <span class="fn">orderSnapshotTrigger</span>(<span class="cls">Snapshotter</span> s) {
+    <span class="kw">return new</span> <span class="cls">EventCountSnapshotTriggerDefinition</span>(s, <span class="num">50</span>);
+}
+
+<span class="cmt">// Wire to aggregate</span>
+<span class="ann">@Aggregate</span>(snapshotTriggerDefinition = <span class="str">"orderSnapshotTrigger"</span>)
+<span class="kw">public class</span> <span class="cls">OrderAggregate</span> { ... }</pre>
+      <div class="rate-row">
+        Did you know this?
+        <button class="rate-btn" onclick="rate(this,'got',10)">✓ Got it</button>
+        <button class="rate-btn" onclick="rate(this,'missed',10)">✗ Missed it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINAL CARD -->
+  <div class="final-card" id="finalCard" style="display:none">
+    <div class="final-score" id="finalScore">10/10</div>
+    <div class="final-label">FINAL SCORE</div>
+    <div class="final-msg" id="finalMsg">Excellent mastery of CQRS + Axon!</div>
+    <button class="reset-btn" onclick="resetAll()">↺ Reset &amp; Try Again</button>
+  </div>
+
+  <div style="height:3rem;"></div>
+</div>
+
+<script>
+const state = { revealed: new Set(), got: new Set(), missed: new Set() };
+
+function reveal(btn, id) {
+  const box = document.getElementById(`ans-${id}`);
+  box.classList.add('show');
+  btn.classList.add('revealed');
+  btn.textContent = '▼ Answer Shown';
+  btn.disabled = true;
+  state.revealed.add(id);
+  updateScore();
+}
+
+function rate(btn, result, id) {
+  const row = btn.closest('.rate-row');
+  row.querySelectorAll('.rate-btn').forEach(b => {
+    b.classList.remove('sel-got','sel-missed');
+  });
+  if (result === 'got') {
+    btn.classList.add('sel-got');
+    state.got.add(id); state.missed.delete(id);
+  } else {
+    btn.classList.add('sel-missed');
+    state.missed.add(id); state.got.delete(id);
+  }
+  updateScore();
+  if ((state.got.size + state.missed.size) === 10) showFinal();
+}
+
+function updateScore() {
+  const answered = state.got.size + state.missed.size;
+  document.getElementById('scoreText').textContent = `${answered} / 10 answered`;
+  document.getElementById('gotCount').textContent = state.got.size;
+  document.getElementById('missedCount').textContent = state.missed.size;
+  document.getElementById('progBar').style.width = (answered / 10 * 100) + '%';
+}
+
+function showFinal() {
+  const score = state.got.size;
+  const card = document.getElementById('finalCard');
+  document.getElementById('finalScore').textContent = `${score}/10`;
+  const msgs = {
+    10: 'Perfect score — you truly understand CQRS + Axon! 🏆',
+    9:  'Outstanding — nearly flawless. Review that one missed concept.',
+    8:  'Strong understanding. A little more practice and you\'ll master it.',
+    7:  'Good foundation — revisit the aggregate and event sourcing sections.',
+    6:  'Getting there — focus on the write-side mechanics.',
+    5:  'Halfway there — re-read the full guide from step 5 onwards.',
+  };
+  document.getElementById('finalMsg').textContent = msgs[score] || 'Keep studying — the concepts will click with practice.';
+  card.style.display = 'block';
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function resetAll() {
+  state.revealed.clear(); state.got.clear(); state.missed.clear();
+  document.querySelectorAll('.answer-box').forEach(b => b.classList.remove('show'));
+  document.querySelectorAll('.answer-btn').forEach(b => {
+    b.classList.remove('revealed'); b.disabled = false; b.textContent = '▶ Show Answer';
+  });
+  document.querySelectorAll('.rate-btn').forEach(b => b.classList.remove('sel-got','sel-missed'));
+  document.getElementById('finalCard').style.display = 'none';
+  updateScore();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>

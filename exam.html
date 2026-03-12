@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mega Quiz — Architecture Mastery</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Fira+Code:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#08090d;
+  --s1:#0f1117;
+  --s2:#151821;
+  --s3:#1c2030;
+  --border:#252a3a;
+  --border2:#2e3548;
+
+  --t1:#f0f2ff;
+  --t2:#a8b0cc;
+  --t3:#5a6380;
+
+  /* topic colors */
+  --c-cqrs:#ff6b6b;
+  --c-ddd:#ffd93d;
+  --c-liq:#6bcb77;
+  --c-eda:#4d96ff;
+  --c-mfe:#c77dff;
+
+  --correct:#22c55e;
+  --wrong:#ef4444;
+  --neutral:#3b4461;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t1);font-family:'Outfit',sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* ── ANIMATED BG ── */
+.bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);
+  background-size:50px 50px;}
+.bg-orb{position:fixed;border-radius:50%;filter:blur(120px);pointer-events:none;z-index:0;opacity:.35;}
+.orb1{width:500px;height:500px;background:rgba(255,107,107,.08);top:-100px;right:-100px;}
+.orb2{width:400px;height:400px;background:rgba(77,150,255,.07);bottom:-80px;left:-80px;}
+.orb3{width:300px;height:300px;background:rgba(199,125,255,.06);top:50%;left:40%;}
+
+/* ── LAYOUT ── */
+.wrap{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:0 1.5rem 5rem}
+
+/* ── HERO ── */
+.hero{text-align:center;padding:3.5rem 0 2.5rem}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:.5rem;
+  background:var(--s2);border:1px solid var(--border2);
+  border-radius:20px;padding:.35rem 1rem;
+  font-family:'Fira Code',monospace;font-size:.65rem;color:var(--t3);
+  letter-spacing:.08em;margin-bottom:1.2rem;
+}
+.hero-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--correct);
+  animation:blink 1.6s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+.hero h1{font-size:clamp(2.2rem,5vw,3.8rem);font-weight:900;line-height:1.05;letter-spacing:-.03em;margin-bottom:.8rem}
+.hero h1 .grad{background:linear-gradient(135deg,#ff6b6b,#ffd93d,#6bcb77,#4d96ff,#c77dff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  background-size:200%;animation:gradShift 5s ease infinite;}
+@keyframes gradShift{0%{background-position:0%}100%{background-position:200%}}
+.hero-sub{font-size:1rem;color:var(--t3);font-weight:400;max-width:520px;margin:0 auto 2rem}
+
+/* TOPIC PILLS */
+.topic-pills{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center;margin-bottom:2.5rem}
+.pill{
+  display:flex;align-items:center;gap:.4rem;
+  padding:.4rem .9rem;border-radius:20px;font-size:.72rem;font-weight:600;
+  border:1.5px solid;cursor:pointer;transition:all .2s;letter-spacing:.02em;
+}
+.pill:hover,.pill.active{transform:translateY(-2px);}
+.pill-all{border-color:var(--border2);color:var(--t2);background:var(--s2);}
+.pill-all.active,.pill-all:hover{background:var(--t1);color:var(--bg);border-color:var(--t1);}
+.pill-cqrs{border-color:rgba(255,107,107,.4);color:var(--c-cqrs);background:rgba(255,107,107,.07);}
+.pill-cqrs.active,.pill-cqrs:hover{background:rgba(255,107,107,.18);}
+.pill-ddd{border-color:rgba(255,217,61,.4);color:var(--c-ddd);background:rgba(255,217,61,.07);}
+.pill-ddd.active,.pill-ddd:hover{background:rgba(255,217,61,.18);}
+.pill-liq{border-color:rgba(107,203,119,.4);color:var(--c-liq);background:rgba(107,203,119,.07);}
+.pill-liq.active,.pill-liq:hover{background:rgba(107,203,119,.18);}
+.pill-eda{border-color:rgba(77,150,255,.4);color:var(--c-eda);background:rgba(77,150,255,.07);}
+.pill-eda.active,.pill-eda:hover{background:rgba(77,150,255,.18);}
+.pill-mfe{border-color:rgba(199,125,255,.4);color:var(--c-mfe);background:rgba(199,125,255,.07);}
+.pill-mfe.active,.pill-mfe:hover{background:rgba(199,125,255,.18);}
+
+/* TYPE FILTER */
+.type-row{display:flex;gap:.4rem;justify-content:center;flex-wrap:wrap;margin-bottom:2rem}
+.type-btn{
+  background:var(--s2);border:1px solid var(--border);color:var(--t3);
+  font-family:'Fira Code',monospace;font-size:.65rem;letter-spacing:.06em;
+  padding:.3rem .8rem;border-radius:6px;cursor:pointer;transition:all .15s;
+}
+.type-btn.active{background:var(--s3);border-color:var(--border2);color:var(--t1);}
+.type-btn:hover{color:var(--t1);}
+
+/* SCOREBOARD */
+.scoreboard{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:.8rem;
+  margin-bottom:2rem;
+}
+.score-card{
+  background:var(--s1);border:1px solid var(--border);border-radius:12px;
+  padding:.9rem 1rem;text-align:center;
+}
+.score-card-num{font-size:1.8rem;font-weight:800;line-height:1;}
+.score-card-lbl{font-family:'Fira Code',monospace;font-size:.58rem;color:var(--t3);
+  letter-spacing:.08em;text-transform:uppercase;margin-top:.2rem;}
+.sc-total .score-card-num{color:#4d96ff;}
+.sc-answered .score-card-num{color:#c77dff;}
+.sc-correct .score-card-num{color:var(--correct);}
+.sc-wrong .score-card-num{color:var(--wrong);}
+.sc-score .score-card-num{color:#ffd93d;}
+
+/* PROGRESS */
+.progress-wrap{margin-bottom:2rem;}
+.progress-top{display:flex;justify-content:space-between;
+  font-family:'Fira Code',monospace;font-size:.65rem;color:var(--t3);margin-bottom:.4rem;}
+.progress-outer{height:5px;background:var(--s3);border-radius:3px;overflow:hidden;}
+.progress-inner{height:100%;border-radius:3px;
+  background:linear-gradient(90deg,#4d96ff,#c77dff);transition:width .5s ease;}
+
+/* ACTIONS */
+.actions-row{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:2rem;}
+.action-btn{
+  background:none;border:1px solid var(--border2);color:var(--t3);
+  font-family:'Fira Code',monospace;font-size:.67rem;padding:.4rem .9rem;
+  border-radius:7px;cursor:pointer;transition:all .15s;letter-spacing:.03em;
+}
+.action-btn:hover{border-color:var(--t2);color:var(--t1);}
+.action-btn.primary{background:var(--t1);color:var(--bg);border-color:var(--t1);font-weight:600;}
+.action-btn.primary:hover{background:#d0d5ff;}
+
+/* ── QUESTION CARD ── */
+.q-card{
+  background:var(--s1);border:1px solid var(--border);border-radius:16px;
+  padding:1.6rem 1.8rem;margin-bottom:1.2rem;
+  transition:border-color .2s,transform .15s;
+  animation:cardIn .3s ease both;
+}
+@keyframes cardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.q-card:hover{border-color:var(--border2);transform:translateY(-1px);}
+
+.q-card-top{display:flex;align-items:flex-start;gap:.9rem;margin-bottom:1.1rem;}
+.q-index{
+  flex-shrink:0;width:34px;height:34px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Fira Code',monospace;font-size:.7rem;font-weight:600;
+  background:var(--s3);color:var(--t3);border:1px solid var(--border);
+}
+.q-index.answered-correct{background:rgba(34,197,94,.12);color:var(--correct);border-color:rgba(34,197,94,.3);}
+.q-index.answered-wrong{background:rgba(239,68,68,.12);color:var(--wrong);border-color:rgba(239,68,68,.3);}
+.q-meta{display:flex;flex-direction:column;gap:.3rem;flex:1;}
+.q-tags{display:flex;gap:.4rem;flex-wrap:wrap;}
+.q-tag{
+  font-family:'Fira Code',monospace;font-size:.58rem;padding:.15rem .45rem;
+  border-radius:4px;border:1px solid;letter-spacing:.04em;font-weight:500;
+}
+.tag-cqrs{background:rgba(255,107,107,.1);color:var(--c-cqrs);border-color:rgba(255,107,107,.25);}
+.tag-ddd{background:rgba(255,217,61,.1);color:var(--c-ddd);border-color:rgba(255,217,61,.25);}
+.tag-liq{background:rgba(107,203,119,.1);color:var(--c-liq);border-color:rgba(107,203,119,.25);}
+.tag-eda{background:rgba(77,150,255,.1);color:var(--c-eda);border-color:rgba(77,150,255,.25);}
+.tag-mfe{background:rgba(199,125,255,.1);color:var(--c-mfe);border-color:rgba(199,125,255,.25);}
+.tag-tf{background:rgba(251,191,36,.1);color:#fbbf24;border-color:rgba(251,191,36,.25);}
+.tag-qcm{background:rgba(56,189,248,.1);color:#38bdf8;border-color:rgba(56,189,248,.25);}
+.tag-fill{background:rgba(167,139,250,.1);color:#a78bfa;border-color:rgba(167,139,250,.25);}
+.tag-qa{background:rgba(52,211,153,.1);color:#34d399;border-color:rgba(52,211,153,.25);}
+
+.q-text{font-size:1rem;font-weight:500;line-height:1.6;color:var(--t1);margin-bottom:1.1rem;}
+
+/* OPTIONS (QCM) */
+.options{display:flex;flex-direction:column;gap:.5rem;}
+.opt{
+  display:flex;align-items:flex-start;gap:.7rem;
+  background:var(--s2);border:1.5px solid var(--border);
+  border-radius:9px;padding:.7rem 1rem;cursor:pointer;
+  transition:all .15s;text-align:left;font-family:'Outfit',sans-serif;
+  font-size:.9rem;color:var(--t2);line-height:1.5;
+}
+.opt:hover:not(:disabled){border-color:var(--border2);background:var(--s3);color:var(--t1);}
+.opt-letter{
+  flex-shrink:0;width:24px;height:24px;border-radius:6px;
+  background:var(--s3);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Fira Code',monospace;font-size:.67rem;font-weight:600;
+  color:var(--t3);margin-top:1px;transition:all .15s;
+}
+.opt.correct{border-color:var(--correct);background:rgba(34,197,94,.08);color:var(--t1);}
+.opt.correct .opt-letter{background:var(--correct);color:#fff;border-color:var(--correct);}
+.opt.wrong{border-color:var(--wrong);background:rgba(239,68,68,.08);color:var(--t1);}
+.opt.wrong .opt-letter{background:var(--wrong);color:#fff;border-color:var(--wrong);}
+.opt.reveal-correct{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.04);}
+.opt.reveal-correct .opt-letter{color:var(--correct);border-color:rgba(34,197,94,.4);}
+
+/* TRUE/FALSE */
+.tf-row{display:flex;gap:.6rem;}
+.tf-btn{
+  flex:1;padding:.6rem;border-radius:9px;cursor:pointer;
+  font-family:'Fira Code',monospace;font-size:.82rem;font-weight:600;
+  letter-spacing:.04em;border:1.5px solid var(--border);
+  background:var(--s2);color:var(--t2);transition:all .15s;
+}
+.tf-btn:hover:not(:disabled){border-color:var(--border2);color:var(--t1);background:var(--s3);}
+.tf-btn.correct{border-color:var(--correct);background:rgba(34,197,94,.1);color:var(--correct);}
+.tf-btn.wrong{border-color:var(--wrong);background:rgba(239,68,68,.1);color:var(--wrong);}
+.tf-btn.reveal-correct{border-color:rgba(34,197,94,.3);color:rgba(34,197,94,.6);}
+
+/* FILL IN THE BLANK */
+.fill-wrap{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.8rem;}
+.fill-input{
+  background:var(--s2);border:1.5px solid var(--border2);color:var(--t1);
+  border-radius:8px;padding:.45rem .9rem;font-family:'Fira Code',monospace;
+  font-size:.85rem;min-width:160px;outline:none;transition:border-color .15s;
+}
+.fill-input:focus{border-color:#4d96ff;}
+.fill-input.correct{border-color:var(--correct);background:rgba(34,197,94,.08);}
+.fill-input.wrong{border-color:var(--wrong);background:rgba(239,68,68,.08);}
+.fill-submit{
+  background:var(--s2);border:1.5px solid var(--border2);color:var(--t2);
+  border-radius:8px;padding:.45rem 1rem;font-family:'Fira Code',monospace;
+  font-size:.75rem;cursor:pointer;transition:all .15s;
+}
+.fill-submit:hover{border-color:var(--t2);color:var(--t1);}
+.fill-hint{font-family:'Fira Code',monospace;font-size:.72rem;color:var(--t3);margin-top:.3rem;}
+.fill-answer-reveal{font-family:'Fira Code',monospace;font-size:.78rem;color:var(--correct);margin-top:.4rem;display:none;}
+.fill-answer-reveal.show{display:block;}
+
+/* Q&A */
+.qa-reveal-btn{
+  background:none;border:1.5px solid var(--border2);color:var(--t3);
+  border-radius:8px;padding:.5rem 1.1rem;font-family:'Outfit',sans-serif;
+  font-size:.82rem;cursor:pointer;transition:all .15s;
+}
+.qa-reveal-btn:hover{border-color:var(--t2);color:var(--t1);}
+.qa-reveal-btn.shown{background:var(--s3);border-color:var(--border2);color:var(--t1);}
+.qa-answer{
+  display:none;margin-top:.9rem;padding:1rem 1.2rem;
+  background:var(--s2);border-left:3px solid #4d96ff;border-radius:0 8px 8px 0;
+  font-size:.9rem;line-height:1.75;color:var(--t2);
+}
+.qa-answer.show{display:block;animation:fadeIn .2s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.qa-answer strong{color:var(--t1);}
+.qa-answer code{font-family:'Fira Code',monospace;font-size:.8em;background:var(--s3);
+  border:1px solid var(--border);border-radius:4px;padding:.1em .35em;color:#c77dff;}
+
+/* EXPLANATION */
+.explanation{
+  display:none;margin-top:.8rem;padding:.8rem 1rem;
+  background:rgba(77,150,255,.05);border-left:2px solid rgba(77,150,255,.4);
+  border-radius:0 7px 7px 0;font-size:.84rem;line-height:1.65;color:var(--t3);
+}
+.explanation.show{display:block;}
+.explanation strong{color:var(--t2);}
+
+/* EMPTY STATE */
+.empty-state{text-align:center;padding:4rem 2rem;color:var(--t3);}
+.empty-state-icon{font-size:3rem;margin-bottom:1rem;}
+.empty-state p{font-size:.9rem;}
+
+/* TOAST */
+.toast{
+  position:fixed;bottom:2rem;right:2rem;z-index:1000;
+  background:var(--s2);border:1px solid var(--border2);
+  border-radius:10px;padding:.8rem 1.2rem;
+  font-family:'Fira Code',monospace;font-size:.75rem;color:var(--t1);
+  transform:translateY(100px);opacity:0;transition:all .3s ease;
+  display:flex;align-items:center;gap:.5rem;
+}
+.toast.show{transform:translateY(0);opacity:1;}
+
+/* FINAL MODAL */
+.modal-overlay{
+  position:fixed;inset:0;z-index:200;background:rgba(8,9,13,.9);
+  backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;
+}
+.modal-overlay.show{display:flex;}
+.modal-box{
+  background:var(--s1);border:1px solid var(--border2);
+  border-radius:20px;padding:3rem 2.5rem;text-align:center;
+  max-width:440px;width:90%;
+}
+.modal-score{font-size:5rem;font-weight:900;line-height:1;
+  background:linear-gradient(135deg,#6bcb77,#4d96ff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.modal-label{font-family:'Fira Code',monospace;font-size:.7rem;color:var(--t3);
+  letter-spacing:.1em;margin:.3rem 0 1rem;}
+.modal-msg{font-size:1rem;color:var(--t2);margin-bottom:1.8rem;line-height:1.6;}
+.modal-btn{
+  background:linear-gradient(135deg,#4d96ff,#c77dff);
+  border:none;color:#fff;border-radius:10px;padding:.8rem 2rem;
+  font-family:'Outfit',sans-serif;font-weight:700;font-size:.95rem;cursor:pointer;
+}
+
+@media(max-width:600px){
+  .q-card{padding:1.1rem 1.1rem;}
+  .tf-row{flex-direction:column;}
+  .scoreboard{grid-template-columns:repeat(3,1fr);}
+  .hero h1{font-size:2rem;}
+  .hero-sub{font-size:.85rem;}
+}
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="bg-orb orb1"></div>
+<div class="bg-orb orb2"></div>
+<div class="bg-orb orb3"></div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <div class="modal-score" id="modalScore">0%</div>
+    <div class="modal-label">FINAL SCORE</div>
+    <p class="modal-msg" id="modalMsg">—</p>
+    <button class="modal-btn" onclick="closeModal()">Continue Reviewing</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="hero-badge">
+      <span class="hero-badge-dot"></span>
+      Architecture Mastery Quiz · 5 Topics · 100+ Questions
+    </div>
+    <h1>Test Your<br><span class="grad">Architecture Knowledge</span></h1>
+    <p class="hero-sub">CQRS/Axon · DDD · Hexagonal · Liquibase · EDA/Event Sourcing · Micro-Frontend</p>
+
+    <div class="topic-pills">
+      <div class="pill pill-all active" onclick="filterTopic('all',this)">⬡ All Topics</div>
+      <div class="pill pill-cqrs" onclick="filterTopic('cqrs',this)">⬡ CQRS + Axon</div>
+      <div class="pill pill-ddd" onclick="filterTopic('ddd',this)">⬡ DDD + Hexagonal</div>
+      <div class="pill pill-liq" onclick="filterTopic('liq',this)">⬡ Liquibase</div>
+      <div class="pill pill-eda" onclick="filterTopic('eda',this)">⬡ EDA + Event Sourcing</div>
+      <div class="pill pill-mfe" onclick="filterTopic('mfe',this)">⬡ Micro-Frontend</div>
+    </div>
+
+    <div class="type-row">
+      <button class="type-btn active" onclick="filterType('all',this)">All Types</button>
+      <button class="type-btn" onclick="filterType('tf',this)">T/F</button>
+      <button class="type-btn" onclick="filterType('qcm',this)">QCM</button>
+      <button class="type-btn" onclick="filterType('fill',this)">Fill Blank</button>
+      <button class="type-btn" onclick="filterType('qa',this)">Q&A</button>
+    </div>
+  </div>
+
+  <div class="scoreboard">
+    <div class="score-card sc-total"><div class="score-card-num" id="s-total">0</div><div class="score-card-lbl">Total</div></div>
+    <div class="score-card sc-answered"><div class="score-card-num" id="s-answered">0</div><div class="score-card-lbl">Answered</div></div>
+    <div class="score-card sc-correct"><div class="score-card-num" id="s-correct">0</div><div class="score-card-lbl">Correct</div></div>
+    <div class="score-card sc-wrong"><div class="score-card-num" id="s-wrong">0</div><div class="score-card-lbl">Wrong</div></div>
+    <div class="score-card sc-score"><div class="score-card-num" id="s-score">—</div><div class="score-card-lbl">Score</div></div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-top"><span id="prog-label">Progress</span><span id="prog-pct">0%</span></div>
+    <div class="progress-outer"><div class="progress-inner" id="prog-bar" style="width:0%"></div></div>
+  </div>
+
+  <div class="actions-row">
+    <button class="action-btn primary" onclick="resetAll()">↺ Reset All</button>
+    <button class="action-btn" onclick="showAll()">▼ Reveal All Answers</button>
+    <button class="action-btn" onclick="shuffleQ()">⇄ Shuffle</button>
+  </div>
+
+  <div id="container"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// QUESTIONS DATABASE
+// ═══════════════════════════════════════════════
+const ALL_QUESTIONS = [
+
+// ───────────────────────────────────────────────
+// TOPIC: CQRS + AXON
+// ───────────────────────────────────────────────
+{id:1,topic:'cqrs',type:'tf',
+ text:'In CQRS, Commands are responsible for both reading and writing data.',
+ answer:false,
+ explain:'Commands only change state (write side). Queries handle all data reads. This is the core CQRS separation.'},
+
+{id:2,topic:'cqrs',type:'qcm',
+ text:'What does AggregateLifecycle.apply() do in an Axon aggregate?',
+ options:['Saves state directly to the database','Publishes an event and triggers @EventSourcingHandler','Sends a command to another aggregate','Queries the read model'],
+ answer:1,
+ explain:'apply() publishes the domain event, stores it in the event store, and calls the @EventSourcingHandler to mutate state.'},
+
+{id:3,topic:'cqrs',type:'fill',
+ text:'The annotation used to mark the aggregate\'s unique identifier field in Axon is ___.',
+ answer:'@AggregateIdentifier',
+ hint:'Starts with @Aggregate...',
+ explain:'@AggregateIdentifier tells Axon which field holds the ID used for command routing and aggregate lookup.'},
+
+{id:4,topic:'cqrs',type:'tf',
+ text:'@EventSourcingHandler and @EventHandler serve the same purpose in Axon.',
+ answer:false,
+ explain:'@EventSourcingHandler is inside the Aggregate (write side, mutates state). @EventHandler is in a Projection (read side, updates views).'},
+
+{id:5,topic:'cqrs',type:'qcm',
+ text:'Which Axon gateway is used to dispatch read queries?',
+ options:['CommandGateway','EventGateway','QueryGateway','SagaGateway'],
+ answer:2,
+ explain:'QueryGateway routes queries to @QueryHandler methods. CommandGateway handles commands. There is no SagaGateway.'},
+
+{id:6,topic:'cqrs',type:'qa',
+ text:'Explain what "Eventual Consistency" means in a CQRS system and why it occurs.',
+ answer:'Eventual consistency means the read model (projection) may temporarily lag behind the write model (event store). It occurs because projections are updated <strong>asynchronously</strong> after events are published. The system is not immediately consistent — but it <strong>eventually converges</strong> to the correct state. This is acceptable in most read-heavy scenarios where perfect real-time consistency is not required.',
+ },
+
+{id:7,topic:'cqrs',type:'fill',
+ text:'A Saga in Axon is used to manage ___ business processes that span multiple aggregates.',
+ answer:'long-running',
+ hint:'Two words: long-___',
+ explain:'Sagas orchestrate long-running business processes that involve multiple steps, aggregates, or external services.'},
+
+{id:8,topic:'cqrs',type:'qcm',
+ text:'What is the purpose of @StartSaga in an Axon Saga?',
+ options:['Ends the saga lifecycle','Creates a new saga instance when triggered','Replays saga events','Registers the saga with CommandBus'],
+ answer:1,
+ explain:'@StartSaga creates a new saga instance when the annotated @SagaEventHandler fires for the first time.'},
+
+{id:9,topic:'cqrs',type:'tf',
+ text:'Snapshots in Axon improve performance by storing aggregate state to avoid replaying all historical events.',
+ answer:true,
+ explain:'EventCountSnapshotTriggerDefinition stores a full aggregate snapshot every N events, so only events after the snapshot need replaying.'},
+
+{id:10,topic:'cqrs',type:'qcm',
+ text:'In Axon, which annotation marks a command field for aggregate routing?',
+ options:['@AggregateIdentifier','@TargetAggregateIdentifier','@CommandRoute','@AggregateRoute'],
+ answer:1,
+ explain:'@TargetAggregateIdentifier on a command field tells the CommandBus which aggregate instance to route the command to.'},
+
+{id:11,topic:'cqrs',type:'fill',
+ text:'The no-arg constructor in an Axon aggregate is needed so Axon can instantiate the aggregate before ___ events.',
+ answer:'replaying',
+ hint:'Axon re-plays stored events...',
+ explain:'Axon calls the no-arg constructor to create an empty shell, then replays stored events to rebuild state.'},
+
+{id:12,topic:'cqrs',type:'tf',
+ text:'In CQRS, the read model and write model are required to use the same database.',
+ answer:false,
+ explain:'CQRS supports polyglot persistence: write side can use PostgreSQL, read side can use Elasticsearch, Redis, MongoDB, etc.'},
+
+{id:13,topic:'cqrs',type:'qcm',
+ text:'What does the TrackingEventProcessor in Axon guarantee?',
+ options:['At-most-once delivery','Exactly-once delivery','At-least-once delivery with resume capability','Best-effort delivery'],
+ answer:2,
+ explain:'TrackingEventProcessor uses a token store to track position. On restart it resumes from where it left off, guaranteeing at-least-once delivery.'},
+
+{id:14,topic:'cqrs',type:'qa',
+ text:'What is the difference between sendAndWait() and send() on the CommandGateway?',
+ answer:'<strong>sendAndWait()</strong> dispatches the command synchronously — it blocks the calling thread until the command is fully processed and throws any exception that occurred. <strong>send()</strong> is asynchronous and returns a CompletableFuture immediately. Use sendAndWait() when you need to know the result immediately (e.g., returning the new ID to a REST client). Use send() for fire-and-forget scenarios or when chaining async operations.'},
+
+{id:15,topic:'cqrs',type:'fill',
+ text:'To configure snapshot creation every 100 events, you use ___ class.',
+ answer:'EventCountSnapshotTriggerDefinition',
+ hint:'EventCount___TriggerDefinition',
+ explain:'EventCountSnapshotTriggerDefinition(snapshotter, 100) triggers a snapshot after every 100 events on the aggregate.'},
+
+// ───────────────────────────────────────────────
+// TOPIC: DDD + HEXAGONAL
+// ───────────────────────────────────────────────
+{id:16,topic:'ddd',type:'tf',
+ text:'In Domain-Driven Design, an Aggregate is a cluster of domain objects that can be treated as a single unit of consistency.',
+ answer:true,
+ explain:'An Aggregate defines a consistency boundary. All invariants within the aggregate must be enforced by the Aggregate Root.'},
+
+{id:17,topic:'ddd',type:'qcm',
+ text:'In DDD, what is the role of the "Aggregate Root"?',
+ options:['Acts as the database entity','Controls access to all objects within the aggregate and enforces invariants','Handles HTTP requests','Manages database transactions directly'],
+ answer:1,
+ explain:'The Aggregate Root is the only entry point to the aggregate. External objects can only reference the root, not internal entities.'},
+
+{id:18,topic:'ddd',type:'fill',
+ text:'In DDD, a ___ is an object defined only by its attributes — it has no identity of its own.',
+ answer:'Value Object',
+ hint:'Value ___',
+ explain:'Value Objects (e.g., Money, Address) have no identity. Two Value Objects with identical attributes are considered equal.'},
+
+{id:19,topic:'ddd',type:'tf',
+ text:'A Bounded Context in DDD defines a clear boundary within which a particular domain model applies.',
+ answer:true,
+ explain:'Bounded Contexts prevent model pollution. The word "Customer" can mean different things in Billing vs. Shipping — each context has its own model.'},
+
+{id:20,topic:'ddd',type:'qcm',
+ text:'Which DDD pattern is used to translate objects between two different Bounded Contexts?',
+ options:['Domain Service','Repository','Anti-Corruption Layer','Aggregate Root'],
+ answer:2,
+ explain:'The Anti-Corruption Layer (ACL) translates between two bounded contexts, preventing one context\'s model from polluting another.'},
+
+{id:21,topic:'ddd',type:'qa',
+ text:'What is the difference between an Entity and a Value Object in DDD?',
+ answer:'An <strong>Entity</strong> has a unique identity that persists over time — even if its attributes change, it is still the same object (e.g., an Order with orderId="42"). A <strong>Value Object</strong> has no identity — it is defined entirely by its attributes, is immutable, and two instances with the same attributes are considered equal (e.g., Money(100, "USD")). Value Objects should be replaced, not mutated.'},
+
+{id:22,topic:'ddd',type:'fill',
+ text:'In Hexagonal Architecture, the ___ layer contains the pure business logic with no framework dependencies.',
+ answer:'Domain',
+ hint:'The core business layer...',
+ explain:'The Domain layer (inner hexagon) contains entities, value objects, aggregates, and domain services. It must have zero dependencies on frameworks or infrastructure.'},
+
+{id:23,topic:'ddd',type:'qcm',
+ text:'In Hexagonal Architecture (Ports and Adapters), what is a "Port"?',
+ options:['A TCP network port','An interface defining how the application communicates with the outside world','A database connection pool','A REST endpoint URL'],
+ answer:1,
+ explain:'A Port is an interface (contract). Driving ports are called by external actors. Driven ports are implemented by infrastructure adapters.'},
+
+{id:24,topic:'ddd',type:'tf',
+ text:'In Hexagonal Architecture, the REST Controller is an example of a "Driven Adapter".',
+ answer:false,
+ explain:'A REST Controller is a "Driving Adapter" — it drives the application. A "Driven Adapter" is something driven by the app, like a JPA repository or email sender.'},
+
+{id:25,topic:'ddd',type:'qcm',
+ text:'Which of the following best describes a "Domain Service" in DDD?',
+ options:['A REST service endpoint','Business logic that doesn\'t naturally fit in an Entity or Value Object','A database ORM service','A Spring @Service annotation class'],
+ answer:1,
+ explain:'A Domain Service encapsulates domain logic that spans multiple aggregates or doesn\'t belong to any single entity. It is stateless.'},
+
+{id:26,topic:'ddd',type:'fill',
+ text:'The ___ pattern in DDD provides an interface for accessing aggregates, hiding persistence details.',
+ answer:'Repository',
+ hint:'Provides a collection-like interface for aggregates...',
+ explain:'Repository pattern abstracts persistence. The domain only knows the Repository interface; the actual JPA/Mongo implementation is an infrastructure detail.'},
+
+{id:27,topic:'ddd',type:'tf',
+ text:'In Hexagonal Architecture, the application core (domain) can import Spring Framework classes directly.',
+ answer:false,
+ explain:'The core must be framework-agnostic. Spring annotations, JPA, and HTTP belong in adapters. This ensures the domain can be tested without any framework.'},
+
+{id:28,topic:'ddd',type:'qcm',
+ text:'What is a "Context Map" in DDD?',
+ options:['A map of all database tables','A diagram showing the relationships between Bounded Contexts','A HashMap of domain entities','A configuration file for microservices'],
+ answer:1,
+ explain:'A Context Map visualizes how different Bounded Contexts relate to each other (Shared Kernel, Customer/Supplier, Conformist, ACL, etc.).'},
+
+{id:29,topic:'ddd',type:'qa',
+ text:'Explain the difference between a Driving Port and a Driven Port in Hexagonal Architecture. Give a real example of each.',
+ answer:'<strong>Driving Port (Primary/Input Port):</strong> An interface that the outside world calls to enter the application. The application implements or exposes this. Example: <code>OrderUseCase</code> interface implemented by <code>OrderService</code>, called by a REST controller.<br><br><strong>Driven Port (Secondary/Output Port):</strong> An interface the application calls to reach external systems. The adapter implements it. Example: <code>OrderRepository</code> interface used by the domain, implemented by <code>JpaOrderRepository</code>.'},
+
+{id:30,topic:'ddd',type:'fill',
+ text:'In DDD, a ___ is a named operation on a domain object that does not return a value but has a side effect.',
+ answer:'Command',
+ hint:'Like CQRS Command — imperative operation...',
+ explain:'In DDD terminology, Commands are operations that change state. They correspond to the "C" in CQRS.'},
+
+// ───────────────────────────────────────────────
+// TOPIC: LIQUIBASE
+// ───────────────────────────────────────────────
+{id:31,topic:'liq',type:'tf',
+ text:'Liquibase allows you to version-control your database schema changes.',
+ answer:true,
+ explain:'Liquibase tracks all schema changes as an ordered sequence of changesets, giving you full version control over your database.'},
+
+{id:32,topic:'liq',type:'qcm',
+ text:'What is a "changeset" in Liquibase?',
+ options:['A Git commit for Java code','A single, uniquely-identified database change with an author and ID','A full database backup','A migration rollback script'],
+ answer:1,
+ explain:'A changeset is the atomic unit of Liquibase. It has a unique id+author combination and represents one logical database change.'},
+
+{id:33,topic:'liq',type:'fill',
+ text:'Liquibase tracks which changesets have been applied in the ___ table.',
+ answer:'DATABASECHANGELOG',
+ hint:'DATABASE___LOG',
+ explain:'DATABASECHANGELOG stores every applied changeset. Liquibase checks this table on startup to know which changes are new.'},
+
+{id:34,topic:'liq',type:'tf',
+ text:'Once a Liquibase changeset has been applied to production, it should never be modified.',
+ answer:true,
+ explain:'Modifying an applied changeset causes a checksum mismatch and Liquibase will refuse to run. Always add new changesets for modifications.'},
+
+{id:35,topic:'liq',type:'qcm',
+ text:'Which file format is NOT natively supported by Liquibase for defining changesets?',
+ options:['XML','YAML','JSON','Python'],
+ answer:3,
+ explain:'Liquibase supports XML, YAML, JSON, and SQL formats natively. Python is not a supported format.'},
+
+{id:36,topic:'liq',type:'qa',
+ text:'What is the difference between Liquibase and Flyway? When would you choose one over the other?',
+ answer:'<strong>Liquibase:</strong> Uses changeset-based migrations in XML/YAML/JSON/SQL. Supports rollbacks, conditional logic, database-agnostic abstractions, and preconditions. More powerful and complex.<br><br><strong>Flyway:</strong> Uses versioned SQL scripts (V1__init.sql, V2__add_column.sql). Simpler, SQL-first approach. No built-in rollback support.<br><br><strong>Choose Liquibase</strong> when you need: rollback support, database-agnostic migrations, complex conditional logic, or team-level change tracking. <strong>Choose Flyway</strong> when you want simplicity and prefer writing plain SQL.'},
+
+{id:37,topic:'liq',type:'fill',
+ text:'The ___ attribute in a Liquibase changeset, when set to true, means Liquibase will run this changeset every time it runs.',
+ answer:'runAlways',
+ hint:'run___',
+ explain:'runAlways="true" causes Liquibase to re-execute this changeset on every run, useful for stored procedures or views that need refreshing.'},
+
+{id:38,topic:'liq',type:'tf',
+ text:'Liquibase can roll back changes using the rollback command if rollback logic is defined.',
+ answer:true,
+ explain:'Liquibase supports rollbacks via explicit <rollback> tags in XML, or automatically for certain operations like createTable.'},
+
+{id:39,topic:'liq',type:'qcm',
+ text:'What does the "context" attribute in a Liquibase changeset allow?',
+ options:['Defines the database type','Conditionally runs changesets only in certain environments (e.g., dev, prod)','Sets the execution timeout','Encrypts the changeset'],
+ answer:1,
+ explain:'Contexts let you tag changesets with environment labels (test, prod, dev) and run only those matching the active context.'},
+
+{id:40,topic:'liq',type:'fill',
+ text:'In Liquibase, the ___ file is the entry point that references all other changelog files.',
+ answer:'master changelog',
+ hint:'master ___log',
+ explain:'A master changelog (db.changelog-master.xml or db.changelog-master.yaml) uses <include> tags to organize changesets across multiple files.'},
+
+{id:41,topic:'liq',type:'tf',
+ text:'Liquibase\'s DATABASECHANGELOGLOCK table prevents multiple instances from running migrations simultaneously.',
+ answer:true,
+ explain:'The lock table ensures only one instance can run migrations at a time — critical in clustered deployments.'},
+
+{id:42,topic:'liq',type:'qcm',
+ text:'What does the "preconditions" block in a Liquibase changeset do?',
+ options:['Defines required Java version','Checks conditions before running the changeset (e.g., table must not exist)','Sets transaction isolation level','Validates XML syntax'],
+ answer:1,
+ explain:'Preconditions verify a condition before executing a changeset. If the condition fails, the changeset can be skipped, marked as error, or halt execution.'},
+
+{id:43,topic:'liq',type:'qa',
+ text:'Write a Liquibase YAML changeset that adds a column "email" (VARCHAR 255, NOT NULL) to an existing "users" table.',
+ answer:'<pre style="background:#0f1117;border-radius:6px;padding:.8rem;font-family:Fira Code,monospace;font-size:.75rem;line-height:1.7;overflow-x:auto;color:#c9d4b5;margin:.5rem 0;">databaseChangeLog:\n  - changeSet:\n      id: 2\n      author: developer\n      changes:\n        - addColumn:\n            tableName: users\n            columns:\n              - column:\n                  name: email\n                  type: varchar(255)\n                  constraints:\n                    nullable: false</pre>'},
+
+{id:44,topic:'liq',type:'fill',
+ text:'Liquibase uses a ___ to detect if an already-applied changeset has been tampered with.',
+ answer:'checksum',
+ hint:'A hash value of the changeset content...',
+ explain:'Liquibase computes a MD5 checksum for each changeset. If the stored checksum differs from the current one, Liquibase refuses to run.'},
+
+{id:45,topic:'liq',type:'tf',
+ text:'You can use Liquibase with Spring Boot by simply adding the liquibase-core dependency — Spring Boot auto-configures it.',
+ answer:true,
+ explain:'Spring Boot auto-configuration detects liquibase-core on the classpath and automatically runs migrations at startup using the configured DataSource.'},
+
+// ───────────────────────────────────────────────
+// TOPIC: EDA + EVENT SOURCING
+// ───────────────────────────────────────────────
+{id:46,topic:'eda',type:'tf',
+ text:'In Event-Driven Architecture, services communicate synchronously by calling each other\'s APIs directly.',
+ answer:false,
+ explain:'EDA promotes asynchronous, loosely-coupled communication through events on a message bus (Kafka, RabbitMQ). Services don\'t call each other directly.'},
+
+{id:47,topic:'eda',type:'qcm',
+ text:'What is the key difference between an "Event" and a "Command" in EDA?',
+ options:['Events are stored, Commands are not','Events describe what happened (past), Commands express intent (future action)','Events are synchronous, Commands are async','There is no difference'],
+ answer:1,
+ explain:'Events are past-tense facts ("OrderCreated"). Commands are imperative intents ("PlaceOrder"). Events can have multiple consumers; commands target one handler.'},
+
+{id:48,topic:'eda',type:'fill',
+ text:'The ability to replay all events from the beginning to rebuild any read model is called ___.',
+ answer:'event replay',
+ hint:'event ___',
+ explain:'Event replay re-processes the full event log to rebuild projections, fix bugs in read models, or create new views from historical data.'},
+
+{id:49,topic:'eda',type:'tf',
+ text:'Events in Event Sourcing can be updated or deleted after they are stored.',
+ answer:false,
+ explain:'Events are immutable and append-only. They are facts. To "undo" something, you publish a new compensating event — you never alter existing ones.'},
+
+{id:50,topic:'eda',type:'qcm',
+ text:'What is "Event-Carried State Transfer" in EDA?',
+ options:['Transferring event store to another server','Events containing all the data needed by consumers, avoiding extra API calls','A pattern for event encryption','Transferring state via REST callbacks'],
+ answer:1,
+ explain:'Event-Carried State Transfer embeds full entity state in the event payload so consumers don\'t need to call back to the source service to get more data.'},
+
+{id:51,topic:'eda',type:'qa',
+ text:'What is the "Outbox Pattern" in EDA and why is it needed?',
+ answer:'The <strong>Outbox Pattern</strong> solves the dual-write problem: ensuring a database write and an event publish happen atomically.<br><br><strong>Problem:</strong> If you save to DB then publish to Kafka, the app could crash between the two — leaving the DB updated but no event sent (or vice versa).<br><br><strong>Solution:</strong> Write both the business data AND the event to an "outbox" table in the same DB transaction. A separate poller/CDC reads the outbox and publishes events to the message bus, then marks them as published. This guarantees eventual consistency without distributed transactions.'},
+
+{id:52,topic:'eda',type:'fill',
+ text:'An event that semantically reverses a previous action in Event Sourcing is called a ___ event.',
+ answer:'compensating',
+ hint:'comp___ing',
+ explain:'Compensating events logically undo a previous action. Since events are immutable, you can\'t delete them — you publish a new event that reverses the effect.'},
+
+{id:53,topic:'eda',type:'tf',
+ text:'Apache Kafka is commonly used as an event store and event bus in Event-Driven Architectures.',
+ answer:true,
+ explain:'Kafka\'s append-only, durable, replayed log makes it suitable for both event streaming (EDA) and as a backing store for event sourcing.'},
+
+{id:54,topic:'eda',type:'qcm',
+ text:'What problem does "event upcasting" solve in Event Sourcing?',
+ options:['Performance optimization during event replay','Handling schema evolution — converting old event formats to new versions','Encrypting events at rest','Partitioning events across services'],
+ answer:1,
+ explain:'Upcasters convert stored old-version events to the current schema without modifying the event store. They run during deserialization.'},
+
+{id:55,topic:'eda',type:'fill',
+ text:'The ___ pattern stores PII encrypted in events and "deletes" data by destroying the encryption key.',
+ answer:'crypto-shredding',
+ hint:'crypto-___',
+ explain:'Crypto-shredding addresses GDPR "right to be forgotten" in immutable event stores by rendering encrypted data unreadable without altering events.'},
+
+{id:56,topic:'eda',type:'tf',
+ text:'The CQRS pattern is a prerequisite to implementing Event Sourcing.',
+ answer:false,
+ explain:'CQRS and Event Sourcing are complementary but independent. You can use Event Sourcing without CQRS, and CQRS without Event Sourcing.'},
+
+{id:57,topic:'eda',type:'qcm',
+ text:'In Event Sourcing, what is the "event store"?',
+ options:['A Redis cache for events','An append-only log that is the single source of truth for all domain state','A dead-letter queue','A replicated database backup'],
+ answer:1,
+ explain:'The event store is an immutable, append-only log of all domain events. State is derived from it, not stored separately.'},
+
+{id:58,topic:'eda',type:'qa',
+ text:'What are the main differences between "Event Notification" and "Event-Carried State Transfer" patterns?',
+ answer:'<strong>Event Notification:</strong> The event is a thin signal — it just says "something happened" with minimal data (e.g., <code>{"type":"OrderPlaced","orderId":"42"}</code>). Consumers must query the source service to get full details. Pros: small payload, source of truth stays centralized. Cons: creates coupling via API calls.<br><br><strong>Event-Carried State Transfer:</strong> The event carries full entity state (<code>{"type":"OrderPlaced","orderId":"42","items":[...],"total":99.99}</code>). Consumers are self-sufficient. Pros: no callback needed, works offline. Cons: larger events, risk of stale data if not designed carefully.'},
+
+{id:59,topic:'eda',type:'fill',
+ text:'A ___ is an event that signals the end-of-life of an aggregate, used when "deletion" needs to be modeled in an append-only store.',
+ answer:'tombstone event',
+ hint:'tombstone ___',
+ explain:'Tombstone events mark an aggregate as deleted. Projections react by removing or hiding it from read models.'},
+
+{id:60,topic:'eda',type:'tf',
+ text:'In EDA, the "Dead Letter Queue" (DLQ) is used to capture events that could not be processed successfully.',
+ answer:true,
+ explain:'DLQs hold failed messages for inspection and reprocessing. They prevent message loss when a consumer throws an unhandled exception.'},
+
+// ───────────────────────────────────────────────
+// TOPIC: MICRO-FRONTEND
+// ───────────────────────────────────────────────
+{id:61,topic:'mfe',type:'tf',
+ text:'Micro-Frontend architecture applies microservices principles to the frontend, splitting a UI into independently deployable pieces.',
+ answer:true,
+ explain:'Each Micro-Frontend (MFE) is developed, tested, and deployed by a separate team, similar to backend microservices.'},
+
+{id:62,topic:'mfe',type:'qcm',
+ text:'Which of the following is the most modern and recommended approach for implementing Micro-Frontends?',
+ options:['iframe embedding','Server-Side Includes (SSI)','Module Federation (Webpack 5)','Copy-pasting JS bundles'],
+ answer:2,
+ explain:'Webpack 5 Module Federation lets MFEs expose and consume each other\'s modules at runtime without bundling everything together.'},
+
+{id:63,topic:'mfe',type:'fill',
+ text:'In Micro-Frontend architecture, the application that loads and composes other MFEs is called the ___ application.',
+ answer:'shell',
+ hint:'Also called "host" or ___ app',
+ explain:'The shell (or host) application acts as the container that bootstraps and composes all MFE fragments into a coherent user experience.'},
+
+{id:64,topic:'mfe',type:'tf',
+ text:'All Micro-Frontends in a project must use the same JavaScript framework (e.g., all React or all Vue).',
+ answer:false,
+ explain:'One MFE advantage is framework independence. Different teams can use React, Vue, or Angular. The shell composes them regardless of technology.'},
+
+{id:65,topic:'mfe',type:'qcm',
+ text:'Which integration approach for Micro-Frontends works entirely at build time (not runtime)?',
+ options:['Module Federation','Web Components','NPM package integration','iFrames'],
+ answer:2,
+ explain:'NPM package integration bundles MFEs as packages at build time. It is the simplest approach but loses independent deployment — all MFEs must be rebuilt when one changes.'},
+
+{id:66,topic:'mfe',type:'qa',
+ text:'What are the main challenges of Micro-Frontend architecture and how can they be mitigated?',
+ answer:'<strong>1. CSS Conflicts:</strong> Styles from different MFEs can collide. Mitigate with CSS Modules, Shadow DOM, or a CSS-in-JS solution per MFE.<br><br><strong>2. Bundle duplication:</strong> Multiple MFEs may bundle the same library (React). Mitigate using Module Federation\'s shared dependencies or a CDN-loaded singleton.<br><br><strong>3. Communication between MFEs:</strong> MFEs shouldn\'t call each other directly. Use a shared event bus (CustomEvents), URL/routing state, or a shared store.<br><br><strong>4. Consistent UX/Design:</strong> Different teams produce different looks. Mitigate with a shared Design System / component library.<br><br><strong>5. Performance:</strong> Multiple JS bundles increase load time. Mitigate with lazy loading, code splitting, and CDN caching.'},
+
+{id:67,topic:'mfe',type:'fill',
+ text:'The browser-native technology that allows MFEs to create isolated, reusable UI components with their own encapsulated styles is ___.',
+ answer:'Web Components',
+ hint:'A browser standard using Custom Elements + Shadow DOM...',
+ explain:'Web Components (Custom Elements, Shadow DOM, HTML Templates) are framework-agnostic and provide native encapsulation — ideal for MFE integration.'},
+
+{id:68,topic:'mfe',type:'tf',
+ text:'In Module Federation, a "remote" exposes modules and a "host" consumes them at runtime.',
+ answer:true,
+ explain:'The remote declares exposed modules in its webpack config. The host declares remote entries to load at runtime — no rebuild needed when remotes change.'},
+
+{id:69,topic:'mfe',type:'qcm',
+ text:'What is "vertical splitting" in Micro-Frontend architecture?',
+ options:['Splitting the UI into top and bottom halves','Each MFE owns a full feature/business domain including its own page, route, and data fetching','Splitting CSS from HTML','Dividing the database vertically'],
+ answer:1,
+ explain:'Vertical splitting aligns MFEs with business domains (Orders MFE, Catalog MFE, Cart MFE) — each team owns the full slice from UI to backend.'},
+
+{id:70,topic:'mfe',type:'fill',
+ text:'MFEs can communicate with each other using browser-native ___ to emit and listen for custom events.',
+ answer:'CustomEvent',
+ hint:'Custom___ API',
+ explain:'CustomEvent + window.dispatchEvent/addEventListener is a framework-agnostic way for MFEs to communicate without direct coupling.'},
+
+{id:71,topic:'mfe',type:'tf',
+ text:'Shared state (e.g., authentication token) should be duplicated and managed independently in each Micro-Frontend.',
+ answer:false,
+ explain:'Global state like auth tokens should be managed by the shell and shared via props, a shared event bus, or browser storage — not duplicated across MFEs.'},
+
+{id:72,topic:'mfe',type:'qcm',
+ text:'Which routing strategy is commonly used in a Micro-Frontend shell application?',
+ options:['Each MFE manages its own global router','The shell owns top-level routing; each MFE manages its own sub-routes','Routing is disabled in MFE architectures','Only hash-based routing works'],
+ answer:1,
+ explain:'The shell handles top-level routes (/orders, /catalog) and lazy-loads the matching MFE. Each MFE then manages its own internal sub-routing.'},
+
+{id:73,topic:'mfe',type:'qa',
+ text:'Explain how Webpack 5 Module Federation works and why it\'s better than previous MFE integration approaches.',
+ answer:'<strong>Module Federation</strong> allows a JavaScript build to dynamically expose and consume modules from other separately-deployed builds at runtime.<br><br><strong>How it works:</strong><br>1. A <em>Remote</em> (e.g., CartMFE) exposes components in webpack config: <code>exposes: { "./Cart": "./src/Cart" }</code><br>2. A <em>Host</em> (Shell) declares: <code>remotes: { cart: "cart@http://cdn.../remoteEntry.js" }</code><br>3. The host lazily imports: <code>const Cart = React.lazy(() => import("cart/Cart"))</code><br>4. At runtime, webpack fetches the remote\'s manifest and loads only what\'s needed.<br><br><strong>Advantages over older approaches:</strong> Unlike NPM packages (rebuild required), iframes (poor UX), or SSI (server-side only), Module Federation enables true runtime integration with shared dependency deduplication, lazy loading, and independent deployments.'},
+
+{id:74,topic:'mfe',type:'fill',
+ text:'The ___ file generated by Module Federation acts as the entry point manifest that lists all exposed modules of a remote.',
+ answer:'remoteEntry.js',
+ hint:'remote___. js',
+ explain:'remoteEntry.js is the runtime manifest generated by webpack for each MFE remote. The host loads it to discover available modules.'},
+
+{id:75,topic:'mfe',type:'tf',
+ text:'A Design System or shared component library is essential in Micro-Frontend architecture to maintain UI consistency across teams.',
+ answer:true,
+ explain:'Without a shared Design System, different teams produce inconsistent UIs. A component library (Storybook + published NPM package) is the standard solution.'},
+
+// ── BONUS MIXED / ADVANCED ──────────────────
+{id:76,topic:'cqrs',type:'qcm',
+ text:'What annotation in Axon causes a saga instance to be cleaned up from the saga store?',
+ options:['@StartSaga','@CloseSaga','@EndSaga','@CompleteSaga'],
+ answer:2,
+ explain:'@EndSaga marks the saga as completed. Axon removes it from the SagaStore, freeing storage for completed processes.'},
+
+{id:77,topic:'ddd',type:'tf',
+ text:'A Domain Event in DDD should contain all data that downstream consumers need, making them self-describing.',
+ answer:true,
+ explain:'Domain Events should be self-contained. Consumers shouldn\'t need to call back to get more data — the event should carry enough context.'},
+
+{id:78,topic:'eda',type:'qcm',
+ text:'What is "Event Streaming" vs "Event Queuing"?',
+ options:['They are identical','Streaming retains events for replay by multiple consumers; Queuing delivers once and removes','Streaming is for frontend, Queuing for backend','Streaming is synchronous, Queuing is async'],
+ answer:1,
+ explain:'Kafka (streaming) retains events and allows multiple consumer groups to read at their own pace and replay. RabbitMQ (queuing) delivers once and removes the message.'},
+
+{id:79,topic:'mfe',type:'tf',
+ text:'Server-Side Composition for Micro-Frontends means the shell assembles MFE HTML fragments on the server before sending to the browser.',
+ answer:true,
+ explain:'SSR-based MFE composition (e.g., with Podium, Tailor, or Next.js multi-zone) assembles fragments server-side for better performance and SEO.'},
+
+{id:80,topic:'ddd',type:'qcm',
+ text:'Which DDD strategic pattern describes two teams agreeing on a shared model that both contexts use?',
+ options:['Anti-Corruption Layer','Open Host Service','Shared Kernel','Published Language'],
+ answer:2,
+ explain:'Shared Kernel means two teams share a subset of the domain model. Any changes require coordination between both teams — it\'s a tight coupling.'},
+
+{id:81,topic:'liq',type:'qa',
+ text:'How does Liquibase handle concurrent deployments across multiple application instances starting simultaneously?',
+ answer:'Liquibase uses the <strong>DATABASECHANGELOGLOCK</strong> table to serialize migrations. When an instance starts:<br>1. It tries to acquire a lock (INSERT into the lock table)<br>2. Only one instance succeeds — the others wait and retry<br>3. The winner runs all pending changesets<br>4. On completion, it releases the lock<br>5. Waiting instances acquire the lock, check DATABASECHANGELOG, find nothing new to run, and release<br><br>This prevents duplicate migrations in clustered deployments (e.g., Kubernetes with multiple replicas starting simultaneously).'},
+
+{id:82,topic:'cqrs',type:'tf',
+ text:'In Axon, a @ProcessingGroup groups event handlers so they share a single EventProcessor configuration.',
+ answer:true,
+ explain:'@ProcessingGroup("name") assigns handlers to a named processor. You can configure threading, error handling, and reset behavior per group.'},
+
+{id:83,topic:'eda',type:'fill',
+ text:'In EDA, the pattern where a service listens to its own events to trigger additional actions is called ___.',
+ answer:'choreography',
+ hint:'chore___raphy',
+ explain:'Choreography: services react to each other\'s events autonomously. Contrast with Orchestration where a central saga/process manager drives the flow.'},
+
+{id:84,topic:'ddd',type:'fill',
+ text:'The DDD tactical pattern that provides a mechanism to convert between domain objects and DTOs is a ___.',
+ answer:'Mapper',
+ hint:'Also called Assembler or ___',
+ explain:'Mappers (or Assemblers) convert between domain objects and DTOs, keeping the domain clean from serialization/API concerns.'},
+
+{id:85,topic:'mfe',type:'qcm',
+ text:'What is the main downside of using iFrames for Micro-Frontend integration?',
+ options:['They require React','They cannot load external URLs','Poor UX (keyboard navigation, accessibility, shared state, URL sync) and performance','They only work in Chrome'],
+ answer:2,
+ explain:'iFrames create hard barriers: keyboard navigation breaks, accessibility is poor, sharing state is complex, URL synchronization is difficult, and performance is impacted by duplicate resource loading.'},
+
+{id:86,topic:'liq',type:'tf',
+ text:'Liquibase changesets with "runOnChange: true" will re-execute whenever the changeset content changes.',
+ answer:true,
+ explain:'runOnChange: true re-runs the changeset if its checksum changes. Useful for views, stored procedures, and functions that need updating.'},
+
+{id:87,topic:'cqrs',type:'qa',
+ text:'What is the Subscription Query in Axon and how does it differ from a regular query?',
+ answer:'A <strong>regular query</strong> via QueryGateway.query() returns a single result at a point in time (request-response pattern).<br><br>A <strong>Subscription Query</strong> via QueryGateway.subscriptionQuery() returns two things:<br>1. An <strong>initial result</strong> — the current state<br>2. A <strong>Flux of updates</strong> — a live stream of incremental changes pushed as the read model updates<br><br>This enables <strong>push-based, real-time</strong> data without polling. The projection calls QueryUpdateEmitter.emit() to push updates to all active subscribers. Ideal for dashboards, live feeds, and reactive UIs.'},
+
+{id:88,topic:'eda',type:'tf',
+ text:'The "Saga" pattern in distributed systems is used to manage data consistency across multiple microservices without using distributed transactions.',
+ answer:true,
+ explain:'Sagas replace 2PC distributed transactions with a sequence of local transactions, each publishing events/commands that trigger the next step.'},
+
+{id:89,topic:'ddd',type:'qcm',
+ text:'Which concept in Hexagonal Architecture is equivalent to a "use case"?',
+ options:['Domain Entity','Application Service (Port Implementer)','Infrastructure Adapter','Value Object'],
+ answer:1,
+ explain:'Application Services implement use cases (input ports). They orchestrate domain objects and call output ports. They sit between adapters and the domain.'},
+
+{id:90,topic:'mfe',type:'fill',
+ text:'In a Micro-Frontend setup, each MFE team should ideally own their code, CI/CD pipeline, and ___ independently.',
+ answer:'deployment',
+ hint:'de___ment',
+ explain:'Independent deployment is the core benefit of MFEs. Each team releases on their own schedule without coordinating with other teams.'},
+
+// ── EXTRA 10 ────────────────────────────────
+{id:91,topic:'cqrs',type:'tf',
+ text:'CommandGateway.send() returns a CompletableFuture that resolves when the command is fully processed.',
+ answer:true,
+ explain:'send() is async and returns CompletableFuture. sendAndWait() blocks. Both deliver the command to the same handler.'},
+
+{id:92,topic:'liq',type:'fill',
+ text:'In Liquibase, the ___ property specifies which Liquibase contexts are active during this run.',
+ answer:'contexts',
+ hint:'con___ts (the property name itself)',
+ explain:'Setting liquibase.contexts=prod activates only changesets tagged with context="prod", skipping dev-only changesets.'},
+
+{id:93,topic:'eda',type:'qcm',
+ text:'What is "event schema registry" used for in EDA?',
+ options:['Managing event store snapshots','Centralizing and versioning event schemas to ensure producer/consumer compatibility','Routing events to topics','Encrypting event payloads'],
+ answer:1,
+ explain:'Schema registries (like Confluent Schema Registry with Avro) store versioned event schemas. Producers and consumers validate schemas at runtime to prevent incompatibilities.'},
+
+{id:94,topic:'ddd',type:'tf',
+ text:'In DDD, infrastructure concerns like email sending or file storage belong in the Domain layer.',
+ answer:false,
+ explain:'Infrastructure concerns belong in adapters (outer layer). The domain defines an interface (port); the infrastructure implements it. The domain must stay pure.'},
+
+{id:95,topic:'mfe',type:'qa',
+ text:'How do Micro-Frontends handle authentication and authorization? Describe a best practice approach.',
+ answer:'Authentication/authorization in MFEs should be centralized in the <strong>shell application</strong>:<br><br>1. The shell handles login/logout and stores the auth token (HttpOnly cookie or memory — not localStorage for security)<br>2. The shell passes auth context (user, roles, token) to each MFE via <strong>props</strong>, a shared event bus, or a global context object<br>3. Each MFE reads from the shared context — it never manages auth independently<br>4. API calls from MFEs use the token; backend services validate it via a shared auth server (OAuth2/OIDC)<br>5. Route guards in the shell prevent unauthorized MFE loading<br><br>This avoids token duplication, ensures single logout works globally, and keeps each MFE\'s auth logic minimal.'},
+
+{id:96,topic:'cqrs',type:'fill',
+ text:'In Axon, the ___ is responsible for storing and retrieving saga instances.',
+ answer:'SagaStore',
+ hint:'Saga___',
+ explain:'SagaStore persists saga state between events. By default Axon uses an in-memory store; for production use JpaSagaStore or MongoSagaStore.'},
+
+{id:97,topic:'eda',type:'tf',
+ text:'In Event Sourcing, the sequence number of an event is important for detecting concurrency conflicts (optimistic locking).',
+ answer:true,
+ explain:'Axon uses event sequence numbers for optimistic locking. If two commands try to append event at the same sequence number, one gets a ConcurrencyException.'},
+
+{id:98,topic:'liq',type:'qcm',
+ text:'Which Spring Boot property configures the path to the Liquibase master changelog file?',
+ options:['spring.datasource.schema','spring.liquibase.change-log','spring.jpa.ddl-auto','spring.liquibase.master'],
+ answer:1,
+ explain:'spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.yaml tells Spring Boot where to find the master changelog file.'},
+
+{id:99,topic:'ddd',type:'qa',
+ text:'Describe the difference between "Orchestration" and "Choreography" in microservices coordination.',
+ answer:'<strong>Orchestration:</strong> A central coordinator (Saga, Process Manager) explicitly tells each service what to do by sending commands. The coordinator knows the full workflow. Easy to understand and debug. Risk: the coordinator becomes a bottleneck and single point of failure.<br><br><strong>Choreography:</strong> Services react autonomously to events published by other services — there is no central brain. Each service knows "when X happens, I do Y." Highly decoupled. Risk: workflow is implicit and harder to trace across logs.<br><br><strong>When to use:</strong> Orchestration for complex, multi-step workflows needing compensation logic (Axon Sagas). Choreography for simple, loosely-coupled event reactions.'},
+
+{id:100,topic:'mfe',type:'tf',
+ text:'In Micro-Frontend architecture, build-time integration via NPM packages allows truly independent deployments.',
+ answer:false,
+ explain:'NPM package integration requires the shell to be rebuilt every time an MFE changes — it\'s build-time coupling. Module Federation or runtime loading achieves true independent deployments.'},
+
+];
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let answers = {};
+let currentTopic = 'all';
+let currentType  = 'all';
+let displayOrder = ALL_QUESTIONS.map(q => q.id);
+
+// ═══════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════
+function getVisible() {
+  return displayOrder
+    .map(id => ALL_QUESTIONS.find(q => q.id === id))
+    .filter(q => q
+      && (currentTopic === 'all' || q.topic === currentTopic)
+      && (currentType  === 'all' || q.type  === currentType));
+}
+
+function render() {
+  const list = getVisible();
+  const container = document.getElementById('container');
+  container.innerHTML = '';
+
+  if (!list.length) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🔍</div><p>No questions match the current filters.</p></div>`;
+    updateStats();
+    return;
+  }
+
+  document.getElementById('s-total').textContent = list.length;
+
+  list.forEach((q, idx) => {
+    const card = document.createElement('div');
+    card.className = 'q-card';
+    card.id = `card-${q.id}`;
+    card.style.animationDelay = `${idx * 0.03}s`;
+
+    const ans = answers[q.id];
+    const topicColors = {cqrs:'tag-cqrs',ddd:'tag-ddd',liq:'tag-liq',eda:'tag-eda',mfe:'tag-mfe'};
+    const topicLabels = {cqrs:'CQRS + Axon',ddd:'DDD + Hexagonal',liq:'Liquibase',eda:'EDA + ES',mfe:'Micro-Frontend'};
+    const typeTag = {tf:'tag-tf',qcm:'tag-qcm',fill:'tag-fill',qa:'tag-qa'}[q.type];
+    const typeLabel = {tf:'T/F',qcm:'QCM',fill:'Fill Blank',qa:'Q&A'}[q.type];
+
+    const idxClass = ans === undefined ? '' : (
+      q.type === 'qa' ? 'answered-correct' :
+      ans === q.answer ? 'answered-correct' : 'answered-wrong'
+    );
+
+    let body = '';
+
+    if (q.type === 'tf') {
+      const ta = ans; const ca = q.answer;
+      const trueClass  = ta === true  ? (ca === true  ? 'correct' : 'wrong') : (ta !== undefined && ca === true  ? 'reveal-correct' : '');
+      const falseClass = ta === false ? (ca === false ? 'correct' : 'wrong') : (ta !== undefined && ca === false ? 'reveal-correct' : '');
+      body = `<div class="tf-row">
+        <button class="tf-btn ${trueClass}" onclick="answerTF(${q.id},true)" ${ta!==undefined?'disabled':''}>✓ TRUE</button>
+        <button class="tf-btn ${falseClass}" onclick="answerTF(${q.id},false)" ${ta!==undefined?'disabled':''}>✗ FALSE</button>
+      </div>`;
+    }
+    else if (q.type === 'qcm') {
+      body = `<div class="options">` + q.options.map((opt,i) => {
+        let cls = '';
+        if (ans !== undefined) {
+          if (i === q.answer) cls = ans === i ? 'correct' : 'reveal-correct';
+          else if (i === ans) cls = 'wrong';
+        }
+        return `<button class="opt ${cls}" onclick="answerQCM(${q.id},${i})" ${ans!==undefined?'disabled':''}>
+          <span class="opt-letter">${'ABCD'[i]}</span><span>${opt}</span>
+        </button>`;
+      }).join('') + `</div>`;
+    }
+    else if (q.type === 'fill') {
+      const submitted = ans !== undefined;
+      const correct = submitted && (ans.toLowerCase().trim() === q.answer.toLowerCase().trim());
+      body = `<div class="fill-wrap">
+        <input class="fill-input ${submitted ? (correct?'correct':'wrong') : ''}"
+          id="fill-${q.id}" type="text" placeholder="Type your answer…"
+          value="${submitted ? (ans||'') : ''}" ${submitted?'disabled':''}
+          onkeydown="if(event.key==='Enter')submitFill(${q.id})">
+        ${!submitted ? `<button class="fill-submit" onclick="submitFill(${q.id})">Check →</button>` : ''}
+      </div>
+      <div class="fill-hint">💡 Hint: ${q.hint}</div>
+      <div class="fill-answer-reveal ${submitted&&!correct?'show':''}">
+        ✓ Correct answer: <strong>${q.answer}</strong>
+      </div>`;
+    }
+    else if (q.type === 'qa') {
+      const shown = ans === 'shown';
+      body = `<button class="qa-reveal-btn ${shown?'shown':''}" onclick="revealQA(${q.id})" ${shown?'disabled':''}>
+        ${shown ? '✓ Answer Revealed' : '▶ Show Answer'}
+      </button>
+      <div class="qa-answer ${shown?'show':''}" id="qa-${q.id}">${q.answer}</div>`;
+    }
+
+    const expShown = ans !== undefined ? 'show' : '';
+    const expHtml = q.type !== 'qa' && q.explain
+      ? `<div class="explanation ${expShown}" id="exp-${q.id}">${q.explain}</div>` : '';
+
+    card.innerHTML = `
+      <div class="q-card-top">
+        <div class="q-index ${idxClass}">${String(idx+1).padStart(2,'0')}</div>
+        <div class="q-meta">
+          <div class="q-tags">
+            <span class="q-tag ${topicColors[q.topic]}">${topicLabels[q.topic]}</span>
+            <span class="q-tag ${typeTag}">${typeLabel}</span>
+          </div>
+        </div>
+      </div>
+      <div class="q-text">${q.text}</div>
+      ${body}
+      ${expHtml}
+    `;
+    container.appendChild(card);
+  });
+  updateStats();
+}
+
+// ═══════════════════════════════════════════════
+// ANSWER HANDLERS
+// ═══════════════════════════════════════════════
+function answerTF(id, val) {
+  if (answers[id] !== undefined) return;
+  answers[id] = val;
+  const q = ALL_QUESTIONS.find(q=>q.id===id);
+  const correct = val === q.answer;
+  showToast(correct ? '✓ Correct!' : '✗ Wrong!', correct);
+  render();
+  checkComplete();
+}
+
+function answerQCM(id, idx) {
+  if (answers[id] !== undefined) return;
+  answers[id] = idx;
+  const q = ALL_QUESTIONS.find(q=>q.id===id);
+  const correct = idx === q.answer;
+  showToast(correct ? '✓ Correct!' : '✗ Wrong!', correct);
+  render();
+  checkComplete();
+}
+
+function submitFill(id) {
+  const input = document.getElementById(`fill-${id}`);
+  if (!input || answers[id] !== undefined) return;
+  const val = input.value.trim();
+  if (!val) return;
+  answers[id] = val;
+  const q = ALL_QUESTIONS.find(q=>q.id===id);
+  const correct = val.toLowerCase() === q.answer.toLowerCase();
+  showToast(correct ? '✓ Correct!' : `✗ Answer: ${q.answer}`, correct);
+  render();
+  checkComplete();
+}
+
+function revealQA(id) {
+  answers[id] = 'shown';
+  render();
+}
+
+// ═══════════════════════════════════════════════
+// FILTERS
+// ═══════════════════════════════════════════════
+function filterTopic(topic, el) {
+  currentTopic = topic;
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+function filterType(type, el) {
+  currentType = type;
+  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+// ═══════════════════════════════════════════════
+// STATS
+// ═══════════════════════════════════════════════
+function updateStats() {
+  const list = getVisible();
+  const total = list.length;
+  let answered=0, correct=0, wrong=0;
+  list.forEach(q => {
+    const a = answers[q.id];
+    if (a === undefined) return;
+    answered++;
+    if (q.type === 'qa') { correct++; return; }
+    if (q.type === 'fill') {
+      if (a.toLowerCase().trim() === q.answer.toLowerCase().trim()) correct++;
+      else wrong++;
+    } else {
+      if (a === q.answer) correct++; else wrong++;
+    }
+  });
+  const pct = answered > 0 ? Math.round(correct/answered*100) : null;
+  document.getElementById('s-total').textContent = total;
+  document.getElementById('s-answered').textContent = answered;
+  document.getElementById('s-correct').textContent = correct;
+  document.getElementById('s-wrong').textContent = wrong;
+  document.getElementById('s-score').textContent = pct !== null ? pct+'%' : '—';
+  const prog = answered/total*100;
+  document.getElementById('prog-bar').style.width = prog+'%';
+  document.getElementById('prog-pct').textContent = Math.round(prog)+'%';
+  document.getElementById('prog-label').textContent = `${answered}/${total} answered`;
+}
+
+function checkComplete() {
+  const list = getVisible().filter(q => q.type !== 'qa');
+  const answered = list.filter(q => answers[q.id] !== undefined);
+  if (answered.length === list.length && list.length > 0 && answered.length >= 5) {
+    const correct = answered.filter(q => {
+      const a = answers[q.id];
+      if (q.type === 'fill') return a.toLowerCase().trim() === q.answer.toLowerCase().trim();
+      return a === q.answer;
+    }).length;
+    const pct = Math.round(correct/answered.length*100);
+    const msgs = [
+      [90,'🏆 Outstanding! You have mastered these architecture concepts.'],
+      [75,'🎉 Great work! Solid understanding across all topics.'],
+      [60,'👍 Good foundation! Review the explanations for missed questions.'],
+      [0,'📚 Keep studying — re-read the concepts and try again.'],
+    ];
+    const msg = msgs.find(m => pct >= m[0])[1];
+    document.getElementById('modalScore').textContent = pct+'%';
+    document.getElementById('modalMsg').textContent = msg;
+    document.getElementById('modalOverlay').classList.add('show');
+  }
+}
+
+// ═══════════════════════════════════════════════
+// ACTIONS
+// ═══════════════════════════════════════════════
+function resetAll() {
+  if (Object.keys(answers).length === 0) return;
+  if (!confirm('Reset all answers?')) return;
+  answers = {};
+  render();
+}
+
+function showAll() {
+  getVisible().forEach(q => {
+    if (answers[q.id] === undefined) {
+      if (q.type === 'qa') answers[q.id] = 'shown';
+      else if (q.type === 'fill') answers[q.id] = q.answer;
+    }
+  });
+  render();
+}
+
+function shuffleQ() {
+  displayOrder = [...displayOrder].sort(() => Math.random()-.5);
+  showToast('Questions shuffled!', true);
+  render();
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+
+// TOAST
+let toastTimer;
+function showToast(msg, success) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.borderColor = success ? 'rgba(34,197,94,.4)' : 'rgba(239,68,68,.4)';
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+render();
+</script>
+</body>
+</html>
